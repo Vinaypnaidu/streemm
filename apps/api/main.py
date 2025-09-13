@@ -4,7 +4,7 @@ app = FastAPI(title="Reelay API")
 
 @app.get("/")
 def root():
-    return {"message": "hello world"}
+    return {"message": "hello from api"}
 
 @app.get("/healthz")
 def healthz():

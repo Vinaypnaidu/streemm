@@ -1,8 +1,13 @@
 type HelloResponse = { message: string };
 
+// export default async function Page() {
+//   const internalBase = process.env.API_BASE_URL ?? "http://api:8000";
+//   const publicBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
 export default async function Page() {
-  const internalBase = process.env.API_BASE_URL ?? "http://api:8000";
-  const publicBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+    const internalBase = process.env.API_BASE_URL ?? "http://localhost:8000";
+    const publicBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
   let message = "(API not running)";
 
   try {
