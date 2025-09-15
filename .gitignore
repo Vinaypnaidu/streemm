@@ -43,11 +43,6 @@ yarn-error.log*
 pnpm-debug.log*
 .vscode/
 
-# Next.js export and lockfiles handled by package managers
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
-
 # Tailwind/PostCSS artifacts (none generated, but keep common caches)
 .postcss-cache/
 .stylelintcache
