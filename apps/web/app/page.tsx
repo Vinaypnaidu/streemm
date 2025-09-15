@@ -132,26 +132,6 @@ export default function Home() {
                 />
               </div>
 
-              {/* <div>
-                <label className="block text-sm font-medium mb-1">
-                  {mode === 'login' ? 'Password' : 'Create a password'}
-                </label>
-                <input
-                  type="password"
-                  minLength={mode === 'login' ? undefined : 8}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-900"
-                />
-                {mode === 'register' && (
-                  <p className="mt-2 text-xs text-neutral-500">
-                    Use 8+ characters with a mix of letters, numbers & symbols.
-                  </p>
-                )}
-              </div> */}
-
               <div>
                 <label className="block text-sm font-medium mb-1">
                   {mode === 'login' ? 'Password' : 'Create a password'}
