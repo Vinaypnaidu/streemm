@@ -1,6 +1,24 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
+
+import config
+from db import healthcheck as db_health
+from cache import healthcheck as cache_health
+from models import User
+from session import get_current_user
+from routes_auth import router as auth_router
 
 app = FastAPI(title="Reelay API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.settings.cors_origins or ["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router)
 
 @app.get("/")
 def root():
@@ -8,10 +26,24 @@ def root():
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True}
+    ok_db = True
+    ok_cache = True
+    try:
+        db_health()
+    except Exception:
+        ok_db = False
+    try:
+        cache_health()
+    except Exception:
+        ok_cache = False
+    return {"ok": ok_db and ok_cache, "db": ok_db, "cache": ok_cache}
 
 @app.get("/hello")
 def hello(name: str = "world"):
     return {"message": f"hello {name}"}
+
+@app.get("/me")
+def me(user: User = Depends(get_current_user)):
+    return {"id": str(user.id), "email": user.email}
 
 # Run: uvicorn main:app --reload --port 8000

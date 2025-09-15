@@ -1,3 +1,12 @@
 fastapi
 uvicorn[standard]
 python-dotenv
+
+sqlalchemy[asyncio]
+alembic
+psycopg[binary]
+redis
+argon2-cffi
+itsdangerous
+slowapi
+email-validator
