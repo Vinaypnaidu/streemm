@@ -1,4 +1,6 @@
+# apps/api/schemas.py
 from pydantic import BaseModel
+from typing import Dict
 
 class RegisterRequest(BaseModel):
     email: str
@@ -14,3 +16,14 @@ class UserOut(BaseModel):
 
 class Ok(BaseModel):
     ok: bool
+
+class PresignRequest(BaseModel):
+    filename: str
+    content_type: str
+    size_bytes: int
+
+class PresignResponse(BaseModel):
+    video_id: str
+    raw_key: str
+    put_url: str
+    headers: Dict[str, str]

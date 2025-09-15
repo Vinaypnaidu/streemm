@@ -10,3 +10,4 @@ argon2-cffi
 itsdangerous
 slowapi
 email-validator
+minio

@@ -7,6 +7,8 @@ from cache import healthcheck as cache_health
 from models import User
 from session import get_current_user
 from routes_auth import router as auth_router
+from routes_uploads import router as uploads_router
+from storage import ensure_bucket
 
 app = FastAPI(title="Reelay API")
 
@@ -19,6 +21,14 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(uploads_router)
+
+@app.on_event("startup")
+def _startup():
+    try:
+        ensure_bucket()
+    except Exception:
+        pass
 
 @app.get("/")
 def root():

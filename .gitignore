@@ -33,7 +33,6 @@ node_modules/
 .npm/
 .pnpm-store/
 .next/
-.next/
 out/
 coverage/
 *.log
@@ -57,6 +56,10 @@ apps/api/.env.*
 apps/web/.env.local
 apps/web/.env*
 !apps/web/.env.example
+
+minio-data/
+.envrc
+.ruff_cache/
 
 # --- OS / Editor ---
 .DS_Store
