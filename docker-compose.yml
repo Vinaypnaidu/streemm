@@ -1,22 +1,70 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: reelay_db
+    environment:
+      POSTGRES_USER: reelay
+      POSTGRES_PASSWORD: reelay
+      POSTGRES_DB: reelay_dev
+    ports:
+      - "5432:5432" # optional: for local psql tools
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reelay -d reelay_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: reelay_redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379" # optional: for local redis-cli
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   api:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "8000:8000"
     volumes:
       - ./apps/api:/app
     environment:
-      - PYTHONUNBUFFERED=1
+      # Container networking URLs
+      DATABASE_URL: postgresql+psycopg://reelay:reelay@db:5432/reelay_dev
+      REDIS_URL: redis://redis:6379/0
+      # App settings
+      ENV: development
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      SESSION_COOKIE_NAME: sid
+      SESSION_TTL_SECONDS: 604800
+      # Secret (prefer from .env.compose)
+      SESSION_SECRET: ${SESSION_SECRET:-changeme}
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   web:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
-    command: npm run dev -- -p 3000 -H 0.0.0.0
+    command: sh -c "npm ci && npm run dev -- -p 3000 -H 0.0.0.0"
     ports:
       - "3000:3000"
     volumes:
@@ -31,5 +79,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  postgres_data:
+  redis_data:
   web_node_modules:
   web_next:
