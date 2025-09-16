@@ -20,6 +20,7 @@ class Settings:
 
         # Object storage / presign
         self.s3_endpoint = os.getenv("S3_ENDPOINT", "http://localhost:9000")
+        self.s3_public_endpoint = os.getenv("S3_PUBLIC_ENDPOINT", self.s3_endpoint)
         self.s3_access_key = os.getenv("S3_ACCESS_KEY", "minioadmin")
         self.s3_secret_key = os.getenv("S3_SECRET_KEY", "minioadmin")
         self.s3_region = os.getenv("S3_REGION", "us-east-1")

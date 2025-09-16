@@ -4,6 +4,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import MetaData
 
+from sqlalchemy import ForeignKey, Index, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
+
 # Naming convention helps Alembic autogenerate predictable constraint names
 naming_convention = {
     "ix": "ix_%(column_0_label)s",
@@ -26,3 +30,53 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class Video(Base):
+    __tablename__ = "videos"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    original_filename = Column(String, nullable=False)
+    storage_key_raw = Column(String, nullable=False)  # e.g., raw/{user_id}/{video_id}.mp4
+
+    status = Column(String, nullable=False, default="uploaded")  # uploaded|processing|ready|failed
+    probe = Column(JSONB, nullable=True)
+    duration_seconds = Column(String, nullable=True)  # can be refined to numeric/float if preferred
+    checksum_sha256 = Column(String, nullable=True)
+    error = Column(String, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    assets = relationship("VideoAsset", back_populates="video", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_videos_user_id_created_at", "user_id", "created_at"),
+    )
+
+class VideoAsset(Base):
+    __tablename__ = "video_assets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
+
+    kind = Column(String, nullable=False)   # hls | thumbnail
+    label = Column(String, nullable=False)  # e.g., 720p | 480p | poster
+    storage_key = Column(String, nullable=False)  # e.g., hls/{video_id}/{label}/...
+    meta = Column(JSONB, nullable=True)     # freeform asset metadata
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    video = relationship("Video", back_populates="assets")
+
+    __table_args__ = (
+        UniqueConstraint("video_id", "kind", "label"),
+        Index("ix_video_assets_video_id", "video_id"),
+    )
