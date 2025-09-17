@@ -39,6 +39,8 @@ def _video_to_detail(v: Video) -> VideoDetail:
     return VideoDetail(
         id=str(v.id),
         status=v.status,
+        title=v.title or "",
+        description=v.description or "",
         original_filename=v.original_filename,
         storage_key_raw=v.storage_key_raw,
         duration_seconds=v.duration_seconds,
@@ -94,6 +96,8 @@ def finalize_video(
         user_id=user.id,
         original_filename=body.original_filename,
         storage_key_raw=body.raw_key,
+        title=(body.title or "").strip(),
+        description=(body.description or "").strip(),
         status="uploaded",
         checksum_sha256=body.checksum_sha256,
     )
@@ -125,6 +129,8 @@ def list_videos(
             id=str(v.id),
             status=v.status,
             original_filename=v.original_filename,
+            title=v.title or "",
+            description=v.description or "",
             created_at=v.created_at,
         )
         for v in items

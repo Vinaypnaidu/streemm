@@ -34,6 +34,8 @@ class FinalizeVideoRequest(BaseModel):
     raw_key: str
     original_filename: str
     checksum_sha256: Optional[str] = None
+    title: Optional[str] = ""
+    description: Optional[str] = ""
 
 class VideoAssetOut(BaseModel):
     id: str
@@ -47,12 +49,16 @@ class VideoOut(BaseModel):
     id: str
     status: str
     original_filename: str
+    title: str
+    description: str
     created_at: datetime
 
 class VideoDetail(BaseModel):
     id: str
     status: str
     original_filename: str
+    title: str
+    description: str
     storage_key_raw: str
     duration_seconds: Optional[str] = None
     checksum_sha256: Optional[str] = None

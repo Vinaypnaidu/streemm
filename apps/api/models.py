@@ -38,6 +38,10 @@ class Video(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
+    # New metadata fields
+    title = Column(String, nullable=False, default="", server_default="")
+    description = Column(String, nullable=False, default="", server_default="")
+
     original_filename = Column(String, nullable=False)
     storage_key_raw = Column(String, nullable=False)  # e.g., raw/{user_id}/{video_id}.mp4
 

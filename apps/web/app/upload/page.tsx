@@ -19,6 +19,8 @@ export default function UploadPage() {
     const { me, loading } = useAuth();
     const [csrf, setCsrf] = useState<string>('');
     const [csrfHeader, setCsrfHeader] = useState<string>('x-csrf-token');
+  const [title, setTitle] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
     const [file, setFile] = useState<File | null>(null);
     const [progress, setProgress] = useState<number>(0);
     const [status, setStatus] = useState<string>('');
@@ -60,6 +62,10 @@ export default function UploadPage() {
   const onUpload = async () => {
     if (!file) {
       setStatus('Select a file first.');
+      return;
+    }
+    if (!title.trim() || !description.trim()) {
+      setStatus('Please enter a title and description.');
       return;
     }
     if (file.type !== 'video/mp4') {
@@ -107,6 +113,8 @@ export default function UploadPage() {
           video_id: presign.video_id,
           raw_key: presign.raw_key,
           original_filename: originalName,
+          title: title.trim(),
+          description: description.trim(),
         }),
       });
       if (!finRes.ok) {
@@ -168,6 +176,28 @@ export default function UploadPage() {
           {status && <p className="mb-3 text-sm text-center text-neutral-200">{status}</p>}
 
           <div className="grid gap-5">
+            <div className="grid gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Enter a title"
+                  className="w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-neutral-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Write a short description"
+                  rows={3}
+                  className="w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-neutral-500"
+                />
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium mb-1">Select file</label>
 

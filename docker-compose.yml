@@ -85,6 +85,48 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    command: sh -c "alembic upgrade head && uvicorn worker:app --host 0.0.0.0 --port 9100 --reload"
+    ports:
+      - "9100:9100"
+    volumes:
+      - ./apps/api:/app
+    environment:
+      DATABASE_URL: postgresql+psycopg://reelay:reelay@db:5432/reelay_dev
+      REDIS_URL: redis://redis:6379/0
+      ENV: development
+      SESSION_COOKIE_NAME: sid
+      SESSION_TTL_SECONDS: 604800
+      SESSION_SECRET: ${SESSION_SECRET:-changeme}
+      PYTHONUNBUFFERED: "1"
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_REGION: us-east-1
+      S3_BUCKET: media
+      S3_USE_SSL: "false"
+      # Worker/FFmpeg envs (defaults fine)
+      FFMPEG_BIN: ffmpeg
+      FFPROBE_BIN: ffprobe
+      FFMPEG_TIMEOUT_720P_SECONDS: 1200
+      FFMPEG_TIMEOUT_480P_SECONDS: 900
+      THUMBNAIL_TIMEOUT_SECONDS: 30
+      FFPROBE_TIMEOUT_SECONDS: 30
+      WORKER_LOCK_TTL_MS: 900000
+      WORKER_BACKOFF_SECONDS: 30,120,300
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
   web:
     build:
       context: ./apps/web
