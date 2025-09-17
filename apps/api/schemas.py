@@ -41,6 +41,7 @@ class VideoAssetOut(BaseModel):
     label: str
     storage_key: str
     meta: Optional[Dict[str, Any]] = None
+    public_url: Optional[str] = None
 
 class VideoOut(BaseModel):
     id: str

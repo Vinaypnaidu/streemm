@@ -1,4 +1,3 @@
-# apps/api/config.py
 import os
 from dotenv import load_dotenv
 
@@ -30,5 +29,18 @@ class Settings:
         self.presign_expires_seconds = int(os.getenv("PRESIGN_EXPIRES_SECONDS", "900"))
         self.upload_max_bytes = int(os.getenv("UPLOAD_MAX_BYTES", str(1 * 1024 * 1024 * 1024)))  # 1GB
         self.upload_allowed_mime = os.getenv("UPLOAD_ALLOWED_MIME", "video/mp4")
+
+        # Worker / FFmpeg settings
+        self.ffmpeg_bin = os.getenv("FFMPEG_BIN", "ffmpeg")
+        self.ffprobe_bin = os.getenv("FFPROBE_BIN", "ffprobe")
+
+        self.ffprobe_timeout_seconds = int(os.getenv("FFPROBE_TIMEOUT_SECONDS", "30"))
+        self.ffmpeg_timeout_720p_seconds = int(os.getenv("FFMPEG_TIMEOUT_720P_SECONDS", "1200"))
+        self.ffmpeg_timeout_480p_seconds = int(os.getenv("FFMPEG_TIMEOUT_480P_SECONDS", "900"))
+        self.thumbnail_timeout_seconds = int(os.getenv("THUMBNAIL_TIMEOUT_SECONDS", "30"))
+
+        self.worker_lock_ttl_ms = int(os.getenv("WORKER_LOCK_TTL_MS", str(15 * 60 * 1000)))
+        backoff_csv = os.getenv("WORKER_BACKOFF_SECONDS", "30,120,300")
+        self.worker_backoff_seconds = [int(x.strip()) for x in backoff_csv.split(",") if x.strip()]
 
 settings = Settings()

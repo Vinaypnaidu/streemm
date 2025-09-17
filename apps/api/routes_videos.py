@@ -18,7 +18,7 @@ from schemas import (
     PaginatedVideos,
     VideoAssetOut,
 )
-from storage import build_raw_key, object_exists
+from storage import build_raw_key, object_exists, build_public_url
 from jobs import enqueue_process_video
 
 router = APIRouter(prefix="/videos", tags=["videos"])
@@ -33,6 +33,7 @@ def _video_to_detail(v: Video) -> VideoDetail:
                 label=a.label,
                 storage_key=a.storage_key,
                 meta=a.meta,
+                public_url=build_public_url(a.storage_key),
             )
         )
     return VideoDetail(
@@ -47,7 +48,7 @@ def _video_to_detail(v: Video) -> VideoDetail:
         created_at=v.created_at,
         assets=assets_out,
     )
-
+    
 @router.post("", response_model=VideoDetail, status_code=status.HTTP_202_ACCEPTED)
 def finalize_video(
     request: Request,

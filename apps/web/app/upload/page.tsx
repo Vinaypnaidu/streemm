@@ -91,14 +91,37 @@ export default function UploadPage() {
 
       setStatus('Uploading to object storage...');
       await uploadWithProgress(presign.put_url, file, presign.headers);
-      setStatus('Upload complete.');
-      // Clear selection but keep progress at 100 so the bar stays visible
+      setProgress(100);
+
+      // Auto-finalize after successful upload
+      setStatus('Finalizing upload...');
+      const originalName = file.name;
+      const finRes = await fetch(`${API_BASE}/videos`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          [csrfHeader]: csrf,
+        },
+        body: JSON.stringify({
+          video_id: presign.video_id,
+          raw_key: presign.raw_key,
+          original_filename: originalName,
+        }),
+      });
+      if (!finRes.ok) {
+        const err = await finRes.json().catch(() => ({}));
+        throw new Error(err.detail || `Finalize failed (${finRes.status})`);
+      }
+      const detail: any = await finRes.json();
+      setStatus(`Finalized. Status: ${detail.status || 'processing'}. video_id=${presign.video_id}`);
+
+      // Clear selection (keep result visible for reference)
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      // Keep `result` visible as confirmation (contains video_id/raw_key)
-      } catch (e: any) {
+    } catch (e: any) {
       setStatus(`Error: ${e.message || String(e)}`);
-     }
+    }
   };
 
   const uploadWithProgress = (url: string, blob: Blob, headers: Record<string, string>) => {
