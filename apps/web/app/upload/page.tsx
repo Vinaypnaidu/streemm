@@ -157,15 +157,15 @@ export default function UploadPage() {
   return (
     <div className="min-h-[calc(100vh-56px)] flex items-center justify-center px-6">
       <div className="w-full max-w-xl mx-auto">
-        <div className="border border-neutral-200 rounded-2xl p-6 shadow-sm bg-white">
+        <div className="border border-neutral-800 rounded-2xl p-6 shadow-sm bg-neutral-900 text-neutral-100">
           <header className="text-center mb-6">
             <h1 className="text-2xl font-semibold tracking-tight">Upload a video</h1>
-            <p className="mt-2 text-sm text-neutral-500">
+            <p className="mt-2 text-sm text-neutral-400">
               MP4 only for now. Keep the tab open during upload.
             </p>
           </header>
 
-          {status && <p className="mb-3 text-sm text-center">{status}</p>}
+          {status && <p className="mb-3 text-sm text-center text-neutral-200">{status}</p>}
 
           <div className="grid gap-5">
             <div>
@@ -184,7 +184,7 @@ export default function UploadPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label
                   htmlFor="video-file"
-                  className="w-full text-center rounded-full border border-neutral-300 px-5 py-3 font-medium hover:bg-neutral-50 transition cursor-pointer"
+                  className="w-full text-center rounded-full border border-neutral-700 px-5 py-3 font-medium hover:bg-neutral-800 transition cursor-pointer"
                 >
                   Choose file
                 </label>
@@ -192,30 +192,30 @@ export default function UploadPage() {
                 <button
                   onClick={onUpload}
                   disabled={!file}
-                  className="w-full rounded-full bg-neutral-900 text-white px-5 py-3 font-medium hover:opacity-90 disabled:opacity-50 transition"
+                  className="w-full rounded-full bg-neutral-100 text-neutral-900 px-5 py-3 font-medium hover:opacity-90 disabled:opacity-50 transition"
                 >
                   {progress > 0 && progress < 100 ? 'Uploading…' : 'Upload'}
                 </button>
               </div>
 
-              <p className="mt-2 text-xs text-neutral-500 h-5 truncate text-center sm:text-left">
+              <p className="mt-2 text-xs text-neutral-400 h-5 truncate text-center sm:text-left">
                 {file ? `${file.name} (${Math.round(file.size / 1024 / 1024)} MB)` : ' '}
               </p>
             </div>
 
             {progress > 0 && (
               <div>
-                <div className="h-2 bg-neutral-200 rounded">
-                  <div className="h-2 bg-neutral-900 rounded" style={{ width: `${progress}%` }} />
+                <div className="h-2 bg-neutral-800 rounded">
+                  <div className="h-2 bg-neutral-100 rounded" style={{ width: `${progress}%` }} />
                 </div>
-                <div className="text-sm text-neutral-600 mt-1 text-center">{progress}%</div>
+                <div className="text-sm text-neutral-300 mt-1 text-center">{progress}%</div>
               </div>
             )}
 
             {result && (
-              <div className="text-sm text-neutral-700">
-                <div><span className="font-medium">video_id:</span> {result.video_id}</div>
-                <div><span className="font-medium">raw_key:</span> {result.raw_key}</div>
+              <div className="text-sm text-neutral-300">
+                <div><span className="font-medium text-neutral-100">video_id:</span> {result.video_id}</div>
+                <div><span className="font-medium text-neutral-100">raw_key:</span> {result.raw_key}</div>
               </div>
             )}
           </div>
