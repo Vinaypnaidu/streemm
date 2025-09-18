@@ -52,6 +52,7 @@ class VideoOut(BaseModel):
     title: str
     description: str
     created_at: datetime
+    thumbnail_public_url: Optional[str] = None
 
 class VideoDetail(BaseModel):
     id: str

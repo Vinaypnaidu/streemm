@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 from datetime import timedelta
 from typing import Optional, Tuple, Dict, Any
 from urllib.parse import urlparse, urlunparse
@@ -46,6 +47,24 @@ def ensure_bucket(bucket: Optional[str] = None) -> None:
     c = client()
     if not c.bucket_exists(b):
         c.make_bucket(b)
+    # Dev-only: try to set public-read policy for convenience
+    if settings.env == "development":
+        try:
+            policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {"Sid": "PublicReadBucket", "Effect": "Allow", "Principal": "*",
+                     "Action": ["s3:GetBucketLocation", "s3:ListBucket"],
+                     "Resource": [f"arn:aws:s3:::{b}"]},
+                    {"Sid": "PublicReadObject", "Effect": "Allow", "Principal": "*",
+                     "Action": ["s3:GetObject"],
+                     "Resource": [f"arn:aws:s3:::{b}/*"]},
+                ],
+            }
+            if hasattr(c, "set_bucket_policy"):
+                c.set_bucket_policy(b, json.dumps(policy))
+        except Exception:
+            pass
 
 def build_raw_key(user_id: str, video_id: str, ext: str) -> str:
     if not ext.startswith("."):
@@ -120,3 +139,26 @@ def presign_get(bucket: str, key: str, expires_seconds: int) -> str:
         return c.presigned_get_object(bucket, key, expires=timedelta(seconds=expires_seconds))
     except AttributeError:
         return c.get_presigned_url("GET", bucket, key, expires=timedelta(seconds=expires_seconds))
+
+def delete_object(bucket: str, key: str) -> None:
+    c = client()
+    try:
+        c.remove_object(bucket, key)
+    except Exception:
+        # Ignore missing or transient errors; caller can decide how to handle
+        pass
+
+def delete_prefix(bucket: str, prefix: str) -> int:
+    c = client()
+    count = 0
+    try:
+        objs = c.list_objects(bucket, prefix=prefix, recursive=True)
+        for obj in objs:
+            try:
+                c.remove_object(bucket, obj.object_name)
+                count += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return count

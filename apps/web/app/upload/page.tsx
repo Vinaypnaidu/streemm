@@ -123,8 +123,9 @@ export default function UploadPage() {
       }
       const detail: any = await finRes.json();
       setStatus(`Finalized. Status: ${detail.status || 'processing'}. video_id=${presign.video_id}`);
+      router.push('/videos');
 
-      // Clear selection (keep result visible for reference)
+      // Clear selection (kept for completeness; will navigate away)
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (e: any) {
