@@ -102,37 +102,6 @@ export default function VideosPage() {
       ) : items.length === 0 ? (
         <p className="text-sm text-neutral-600">No videos yet. Use the “+ Create” button to upload.</p>
       ) : (
-        // <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        //   {items.map(v => {
-        //     const name = (v.title && v.title.trim()) || v.original_filename;
-        //     return (
-        //       <div key={v.id} className="rounded-lg overflow-hidden bg-neutral-900">
-        //         <Link href={`/videos/${v.id}`} className="block">
-        //           {v.thumbnail_public_url ? (
-        //             <img
-        //               src={v.thumbnail_public_url}
-        //               alt=""
-        //               className="w-full aspect-video object-cover"
-        //             />
-        //           ) : (
-        //             <div className="w-full aspect-video grid place-items-center text-neutral-400 bg-neutral-800">
-        //               No thumbnail
-        //             </div>
-        //           )}
-        //         </Link>
-        //         <div className="p-4">
-        //           <div className="flex items-center justify-between mb-2">
-        //             <Link href={`/videos/${v.id}`} className="font-medium text-sm truncate mr-3 hover:underline" title={name}>
-        //               {name}
-        //             </Link>
-        //             <StatusBadge status={v.status} />
-        //           </div>
-        //           <div className="text-xs text-neutral-500">Created: {new Date(v.created_at).toLocaleString()}</div>
-        //         </div>
-        //       </div>
-        //     );
-        //   })}
-        // </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {items.map(v => {
             const name = (v.title && v.title.trim()) || v.original_filename;
@@ -165,7 +134,7 @@ export default function VideosPage() {
 
                 {/* Menu */}
                 {open && (
-                  <div className="absolute top-10 right-2 z-10 w-36 rounded-md border border-neutral-800 bg-neutral-900 shadow-lg">
+                  <div className="absolute top-10 right-2 z-10 w-34 rounded-md border border-neutral-800 bg-neutral-900 shadow-lg">
                     <button
                       className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 disabled:opacity-50"
                       onClick={() => {
