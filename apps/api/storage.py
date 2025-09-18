@@ -91,15 +91,16 @@ def build_public_url(key: str) -> str:
     return f"{base}/{settings.s3_bucket}/{key}"
 
 def _guess_content_type(path: str) -> str:
-    if path.endswith(".m3u8"):
+    p = path.lower()
+    if p.endswith(".m3u8"):
         return "application/vnd.apple.mpegurl"
-    if path.endswith(".ts"):
+    if p.endswith(".ts"):
         return "video/MP2T"
-    if path.endswith(".mp4"):
+    if p.endswith(".mp4"):
         return "video/mp4"
-    if path.endswith(".jpg") or path.endswith(".jpeg"):
+    if p.endswith(".jpg") or p.endswith(".jpeg"):
         return "image/jpeg"
-    if path.endswith(".png"):
+    if p.endswith(".png"):
         return "image/png"
     return "application/octet-stream"
 

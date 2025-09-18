@@ -77,7 +77,30 @@ def _run_ffprobe(path: str) -> dict:
     log.info(json.dumps({"step": "ffprobe", "duration_ms": dt}))
     return json.loads(res.stdout)
 
-def _transcode_hls_720p(src_path: str, out_dir: str) -> None:
+def _parse_fps_from_probe(probe: dict) -> float:
+    # Look for the first video stream
+    for s in probe.get("streams", []):
+        if s.get("codec_type") == "video":
+            for k in ("avg_frame_rate", "r_frame_rate"):
+                fr = s.get(k)
+                if isinstance(fr, str) and "/" in fr:
+                    num, den = fr.split("/")
+                    try:
+                        num, den = float(num), float(den)
+                        if den > 0:
+                            return num / den
+                    except Exception:
+                        pass
+    return 30.0  # fallback
+
+def _derive_gop_2s(fps: float) -> int:
+    try:
+        g = int(round(fps * 2.0))
+        return max(24, min(240, g))  # clamp to [24, 240]
+    except Exception:
+        return 60
+
+def _transcode_hls_720p(src_path: str, out_dir: str, gop: int) -> None:
     os.makedirs(out_dir, exist_ok=True)
     playlist = os.path.join(out_dir, "index.m3u8")
     seg_pat = os.path.join(out_dir, "seg_%03d.ts")
@@ -90,8 +113,8 @@ def _transcode_hls_720p(src_path: str, out_dir: str) -> None:
         "-profile:v", "main",
         "-crf", "20",
         "-preset", "veryfast",
-        "-g", "48",
-        "-keyint_min", "48",
+        "-g", str(gop),
+        "-keyint_min", str(gop),
         "-sc_threshold", "0",
         "-c:a", "aac",
         "-b:a", "128k",
@@ -106,7 +129,7 @@ def _transcode_hls_720p(src_path: str, out_dir: str) -> None:
         raise RuntimeError(f"ffmpeg(720p) failed: code={res.returncode} err={res.stderr.strip()}")
     log.info(json.dumps({"step": "hls_720p", "duration_ms": dt}))
 
-def _transcode_hls_480p(src_path: str, out_dir: str) -> None:
+def _transcode_hls_480p(src_path: str, out_dir: str, gop: int) -> None:
     os.makedirs(out_dir, exist_ok=True)
     playlist = os.path.join(out_dir, "index.m3u8")
     seg_pat = os.path.join(out_dir, "seg_%03d.ts")
@@ -119,8 +142,8 @@ def _transcode_hls_480p(src_path: str, out_dir: str) -> None:
         "-profile:v", "main",
         "-crf", "22",
         "-preset", "veryfast",
-        "-g", "48",
-        "-keyint_min", "48",
+        "-g", str(gop),
+        "-keyint_min", str(gop),
         "-sc_threshold", "0",
         "-c:a", "aac",
         "-b:a", "96k",
@@ -240,6 +263,8 @@ def process_video(video_id: str, reason: str) -> None:
 
             # FFPROBE (idempotent-safe; overwrites)
             probe = _run_ffprobe(local_raw)
+            fps = _parse_fps_from_probe(probe)
+            gop = _derive_gop_2s(fps)
             duration = None
             try:
                 duration = probe.get("format", {}).get("duration")
@@ -258,7 +283,7 @@ def process_video(video_id: str, reason: str) -> None:
             exists, _ = object_exists(settings.s3_bucket, playlist_key)
             if not exists:
                 out_dir = os.path.join(tmpd, "hls_720p")
-                _transcode_hls_720p(local_raw, out_dir)
+                _transcode_hls_720p(local_raw, out_dir, gop)
                 upload_dir(settings.s3_bucket, f"hls/{video_id}/720p", out_dir)
             else:
                 log.info(json.dumps({"video_id": video_id, "step": "hls_720p", "skip": "exists"}))
@@ -268,7 +293,7 @@ def process_video(video_id: str, reason: str) -> None:
             exists480, _ = object_exists(settings.s3_bucket, playlist_key_480)
             if not exists480:
                 out_dir_480 = os.path.join(tmpd, "hls_480p")
-                _transcode_hls_480p(local_raw, out_dir_480)
+                _transcode_hls_480p(local_raw, out_dir_480, gop)
                 upload_dir(settings.s3_bucket, f"hls/{video_id}/480p", out_dir_480)
             else:
                 log.info(json.dumps({"video_id": video_id, "step": "hls_480p", "skip": "exists"}))
