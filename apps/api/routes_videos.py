@@ -17,7 +17,8 @@ from schemas import (
     VideoOut,
     PaginatedVideos,
     VideoAssetOut,
-    Ok
+    Ok,
+    PublicVideoDetail,
 )
 from storage import build_raw_key, object_exists, build_public_url, build_thumbnail_key, delete_object, delete_prefix
 from jobs import enqueue_process_video
@@ -51,7 +52,32 @@ def _video_to_detail(v: Video) -> VideoDetail:
         created_at=v.created_at,
         assets=assets_out,
     )
-    
+
+def _video_to_public_detail(v: Video) -> PublicVideoDetail:
+    assets_out: List[VideoAssetOut] = []
+    for a in (v.assets or []):
+        assets_out.append(
+            VideoAssetOut(
+                id=str(a.id),
+                kind=a.kind,
+                label=a.label,
+                storage_key=a.storage_key,
+                meta=a.meta,
+                public_url=build_public_url(a.storage_key),
+            )
+        )
+    return PublicVideoDetail(
+        id=str(v.id),
+        status=v.status,
+        title=v.title or "",
+        description=v.description or "",
+        original_filename=v.original_filename,
+        duration_seconds=v.duration_seconds,
+        error=v.error,
+        created_at=v.created_at,
+        assets=assets_out,
+    )
+
 @router.post("", response_model=VideoDetail, status_code=status.HTTP_202_ACCEPTED)
 def finalize_video(
     request: Request,
@@ -109,8 +135,8 @@ def finalize_video(
     enqueue_process_video(str(v.id), reason="finalize")
     return _video_to_detail(v)
 
-@router.get("", response_model=PaginatedVideos)
-def list_videos(
+@router.get("/my", response_model=PaginatedVideos)
+def list_my_videos(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     limit: int = 20,
@@ -144,10 +170,9 @@ def list_videos(
     next_offset = offset + len(items) if has_more else None
     return PaginatedVideos(items=out, next_offset=next_offset)
 
-@router.get("/{video_id}", response_model=VideoDetail)
+@router.get("/{video_id}", response_model=PublicVideoDetail)
 def get_video(
     video_id: str,
-    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     try:
@@ -158,12 +183,10 @@ def get_video(
     v: Optional[Video] = db.get(Video, vid)
     if not v:
         raise HTTPException(status_code=404, detail="Not found")
-    if v.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Forbidden")
 
     # Access assets (relationship)
     _ = v.assets
-    return _video_to_detail(v)
+    return _video_to_public_detail(v)
 
 @router.delete("/{video_id}", response_model=Ok)
 def delete_video(

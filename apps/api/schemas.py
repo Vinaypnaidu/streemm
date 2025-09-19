@@ -68,6 +68,17 @@ class VideoDetail(BaseModel):
     created_at: datetime
     assets: List[VideoAssetOut] = []
 
+class PublicVideoDetail(BaseModel):
+    id: str
+    status: str
+    original_filename: str
+    title: str
+    description: str
+    duration_seconds: Optional[str] = None
+    error: Optional[str] = None
+    created_at: datetime
+    assets: List[VideoAssetOut] = []
+
 class PaginatedVideos(BaseModel):
     items: List[VideoOut]
     next_offset: Optional[int] = None

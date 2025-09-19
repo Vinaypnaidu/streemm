@@ -70,7 +70,7 @@ export default function VideosPage() {
   async function load() {
     setFetching(true);
     try {
-      const res = await fetch(`${API_BASE}/videos?limit=50`, { credentials: 'include' });
+      const res = await fetch(`${API_BASE}/videos/my?limit=50`, { credentials: 'include' });
       if (res.ok) {
         const data: PageResp = await res.json();
         setItems(data.items || []);
