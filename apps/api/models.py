@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, func
+from sqlalchemy import Column, String, DateTime, Integer, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import MetaData
@@ -82,4 +82,17 @@ class VideoAsset(Base):
     __table_args__ = (
         UniqueConstraint("video_id", "kind", "label"),
         Index("ix_video_assets_video_id", "video_id"),
+    )
+
+class WatchHistory(Base):
+    __tablename__ = "watch_history"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+
+    last_position_seconds = Column(Integer, nullable=False, server_default="0")
+    last_watched_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_watch_history_user_lastwatched", "user_id", "last_watched_at"),
     )

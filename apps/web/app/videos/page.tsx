@@ -31,7 +31,7 @@ function StatusBadge({ status }: { status: VideoItem['status'] }) {
 }
 
 export default function VideosPage() {
-  const { me, loading } = useAuth();
+  const { me, loading, getCsrf } = useAuth();
   const [items, setItems] = useState<VideoItem[]>([]);
   const [fetching, setFetching] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -40,17 +40,13 @@ export default function VideosPage() {
   async function deleteVideo(id: string) {
     try {
       setDeletingId(id);
-      // Get CSRF token
-      const resCsrf = await fetch(`${API_BASE}/auth/csrf`, { credentials: 'include' });
-      const dataCsrf = await resCsrf.json();
-      const csrf = dataCsrf.csrf;
-      const headerName = dataCsrf.header || 'x-csrf-token';
+      const csrf = await getCsrf();
 
       const res = await fetch(`${API_BASE}/videos/${id}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {
-          [headerName]: csrf,
+          'x-csrf-token': csrf,
         },
       });
       if (!res.ok) {
@@ -95,8 +91,8 @@ export default function VideosPage() {
   if (loading || !me) return null;
 
   return (
-    <div className="px-10 py-8">
-      <h1 className="text-2xl font-semibold mb-4">Your videos</h1>
+    <div className="px-12 py-8">
+      <h1 className="text-3xl font-semibold mb-4">Your videos</h1>
       {fetching && items.length === 0 ? (
         <p className="text-sm text-neutral-600">Loading…</p>
       ) : items.length === 0 ? (

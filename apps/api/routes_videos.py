@@ -5,11 +5,12 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from csrf import require_csrf
 from db import get_db
 from session import get_current_user
-from models import User, Video, VideoAsset
+from models import User, Video, VideoAsset, WatchHistory
 from config import settings
 from schemas import (
     FinalizeVideoRequest,
@@ -53,7 +54,12 @@ def _video_to_detail(v: Video) -> VideoDetail:
         assets=assets_out,
     )
 
-def _video_to_public_detail(v: Video) -> PublicVideoDetail:
+def _video_to_public_detail(
+    v: Video,
+    *,
+    resume_from_seconds: Optional[int] = None,
+    progress_percent: Optional[float] = None,
+) -> PublicVideoDetail:
     assets_out: List[VideoAssetOut] = []
     for a in (v.assets or []):
         assets_out.append(
@@ -76,6 +82,8 @@ def _video_to_public_detail(v: Video) -> PublicVideoDetail:
         error=v.error,
         created_at=v.created_at,
         assets=assets_out,
+        resume_from_seconds=resume_from_seconds,
+        progress_percent=progress_percent,
     )
 
 @router.post("", response_model=VideoDetail, status_code=status.HTTP_202_ACCEPTED)
@@ -173,6 +181,7 @@ def list_my_videos(
 @router.get("/{video_id}", response_model=PublicVideoDetail)
 def get_video(
     video_id: str,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     try:
@@ -184,9 +193,43 @@ def get_video(
     if not v:
         raise HTTPException(status_code=404, detail="Not found")
 
-    # Access assets (relationship)
+    # Ensure relationship loads for assets
     _ = v.assets
-    return _video_to_public_detail(v)
+
+    # Upsert watch_history row and apply 95% reset-on-read
+    wh: Optional[WatchHistory] = (
+        db.query(WatchHistory)
+        .filter(WatchHistory.user_id == user.id, WatchHistory.video_id == v.id)
+        .first()
+    )
+    if not wh:
+        wh = WatchHistory(user_id=user.id, video_id=v.id, last_position_seconds=0)
+        db.add(wh)
+        db.commit()
+        db.refresh(wh)
+
+    position = int(wh.last_position_seconds or 0)
+    resume_from = position
+    progress_percent: Optional[float] = None
+
+    dur = None
+    try:
+        dur = float(v.duration_seconds) if v.duration_seconds is not None else None
+    except Exception:
+        dur = None
+
+    if dur and dur > 0:
+        pct = max(0.0, min(100.0, (position / dur) * 100.0))
+        progress_percent = pct
+        if (position / dur) >= 0.95:
+            resume_from = 0
+            wh.last_position_seconds = 0
+
+    # Always update last_watched_at on access
+    wh.last_watched_at = func.now()
+    db.commit()
+
+    return _video_to_public_detail(v, resume_from_seconds=resume_from, progress_percent=progress_percent)
 
 @router.delete("/{video_id}", response_model=Ok)
 def delete_video(

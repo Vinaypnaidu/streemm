@@ -16,9 +16,7 @@ type PresignResponse = {
 
 export default function UploadPage() {
     const router = useRouter();
-    const { me, loading } = useAuth();
-    const [csrf, setCsrf] = useState<string>('');
-    const [csrfHeader, setCsrfHeader] = useState<string>('x-csrf-token');
+    const { me, loading, getCsrf } = useAuth();
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
     const [file, setFile] = useState<File | null>(null);
@@ -34,22 +32,7 @@ export default function UploadPage() {
     }
     }, [loading, me, router]);
     
-
-  useEffect(() => {
-    // Fetch CSRF on mount
-    (async () => {
-        try {
-        const res = await fetch(`${API_BASE}/auth/csrf`, {
-            credentials: 'include',
-        });
-        const data = await res.json();
-        setCsrf(data.csrf);
-        setCsrfHeader(data.header || 'x-csrf-token');
-        } catch (e) {
-        console.error(e);
-        }
-    })();
-    }, []);
+  // CSRF provided centrally via getCsrf()
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null;
@@ -75,12 +58,13 @@ export default function UploadPage() {
 
     setStatus('Requesting presigned URL...');
     try {
+      const csrf = await getCsrf();
       const presignRes = await fetch(`${API_BASE}/uploads/presign`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          [csrfHeader]: csrf,
+          'x-csrf-token': csrf,
         },
         body: JSON.stringify({
           filename: file.name,
@@ -102,12 +86,13 @@ export default function UploadPage() {
       // Auto-finalize after successful upload
       setStatus('Finalizing upload...');
       const originalName = file.name;
+      const csrf2 = await getCsrf();
       const finRes = await fetch(`${API_BASE}/videos`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          [csrfHeader]: csrf,
+          'x-csrf-token': csrf2,
         },
         body: JSON.stringify({
           video_id: presign.video_id,

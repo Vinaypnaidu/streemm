@@ -10,6 +10,7 @@ from routes_auth import router as auth_router
 from routes_uploads import router as uploads_router
 from storage import ensure_bucket
 from routes_videos import router as videos_router
+from routes_history import router as history_router
 
 app = FastAPI(title="Reelay API")
 
@@ -24,6 +25,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(uploads_router)
 app.include_router(videos_router)
+app.include_router(history_router)
 
 @app.on_event("startup")
 def _startup():

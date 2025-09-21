@@ -76,7 +76,7 @@ export default function Navbar() {
 
       {/* Sidebar */}
       <Sidebar />
-      <div className="hidden md:block w-60" aria-hidden="true" />
+      <div className="hidden md:block w-72" aria-hidden="true" />
     </>
   );
 }

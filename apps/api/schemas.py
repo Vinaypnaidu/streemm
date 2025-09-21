@@ -78,6 +78,26 @@ class PublicVideoDetail(BaseModel):
     error: Optional[str] = None
     created_at: datetime
     assets: List[VideoAssetOut] = []
+    resume_from_seconds: Optional[int] = None
+    progress_percent: Optional[float] = None
+
+class HeartbeatRequest(BaseModel):
+    video_id: str
+    position_seconds: int
+
+class HistoryItem(BaseModel):
+    video_id: str
+    original_filename: str
+    title: str
+    thumbnail_url: Optional[str] = None
+    last_position_seconds: int
+    duration_seconds: Optional[float] = None
+    progress_percent: Optional[float] = None
+    last_watched_at: datetime
+
+class PaginatedHistory(BaseModel):
+    items: List[HistoryItem]
+    next_offset: Optional[int] = None
 
 class PaginatedVideos(BaseModel):
     items: List[VideoOut]

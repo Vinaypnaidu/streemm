@@ -25,7 +25,7 @@ export default function Sidebar() {
   if (!mounted || loading || !me) return null;
 
   return (
-    <aside className="fixed top-14 left-0 w-60 h-[calc(100vh-56px)] border-r border-neutral-900 bg-neutral-900 text-neutral-100 px-2">
+    <aside className="fixed top-14 left-0 w-72 h-[calc(100vh-56px)] border-r border-neutral-900 bg-neutral-900 text-neutral-100 px-2">
       <nav className="py-3 space-y-2">
         <Item href="/" label="Home" icon={<span>🏠</span>} active={pathname === '/'} />
         <Item href="/history" label="History" icon={<span>🕘</span>} active={pathname?.startsWith('/history')} />

@@ -12,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <AuthGate>
             <Navbar />
-            <main className="min-h-[calc(100vh-56px)] md:pl-60">{children}</main>
+            <main className="min-h-[calc(100vh-56px)] md:pl-72">{children}</main>
           </AuthGate>
         </AuthProvider>
       </body>
