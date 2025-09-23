@@ -13,6 +13,7 @@ from models import User, WatchHistory, Video
 from schemas import Ok, HeartbeatRequest, PaginatedHistory, HistoryItem
 from storage import build_thumbnail_key, build_public_url, object_exists
 from config import settings
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 router = APIRouter(prefix="/history", tags=["history"])
 
@@ -33,27 +34,35 @@ def heartbeat(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid video_id")
 
-    # Clamp and normalize position
-    pos = max(0, int(body.position_seconds))
+    # Clamp and normalize position (float seconds)
+    try:
+        pos = max(0.0, float(body.position_seconds))
+    except Exception:
+        pos = 0.0
 
     # Ensure video exists (optional, but avoids orphan rows)
     v: Optional[Video] = db.get(Video, vid)
     if not v:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    wh: Optional[WatchHistory] = (
-        db.query(WatchHistory)
-        .filter(WatchHistory.user_id == user.id, WatchHistory.video_id == v.id)
-        .first()
+    # Atomic upsert to avoid races
+    stmt = (
+        pg_insert(WatchHistory)
+        .values(
+            user_id=user.id,
+            video_id=v.id,
+            last_position_seconds=pos,
+            last_watched_at=func.now(),
+        )
+        .on_conflict_do_update(
+            constraint="pk_watch_history",
+            set_={
+                "last_position_seconds": pos,
+                "last_watched_at": func.now(),
+            },
+        )
     )
-    if wh is None:
-        print(f"Creating watch history for video {v.id}")
-        wh = WatchHistory(user_id=user.id, video_id=v.id, last_position_seconds=pos)
-        db.add(wh)
-    else:
-        print(f"Updating watch history for video {v.id}")
-        wh.last_position_seconds = pos
-    wh.last_watched_at = func.now()
+    db.execute(stmt)
     db.commit()
 
     return Ok(ok=True)
@@ -96,7 +105,7 @@ def list_history(
                 original_filename=v.original_filename,
                 title=v.title or "",
                 thumbnail_url=thumb_url,
-                last_position_seconds=int(wh.last_position_seconds or 0),
+                last_position_seconds=float(wh.last_position_seconds or 0),
                 duration_seconds=dur,
                 progress_percent=progress,
                 last_watched_at=wh.last_watched_at,

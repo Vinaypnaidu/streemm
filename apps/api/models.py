@@ -90,7 +90,7 @@ class WatchHistory(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, nullable=False)
     video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
 
-    last_position_seconds = Column(Integer, nullable=False, server_default="0")
+    last_position_seconds = Column(Float, nullable=False, server_default="0")
     last_watched_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (

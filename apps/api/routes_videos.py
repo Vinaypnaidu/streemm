@@ -23,6 +23,7 @@ from schemas import (
 )
 from storage import build_raw_key, object_exists, build_public_url, build_thumbnail_key, delete_object, delete_prefix
 from jobs import enqueue_process_video
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -203,12 +204,21 @@ def get_video(
         .first()
     )
     if not wh:
-        wh = WatchHistory(user_id=user.id, video_id=v.id, last_position_seconds=0)
-        db.add(wh)
+        # Perform an atomic upsert to avoid race conditions on concurrent loads
+        stmt = (
+            pg_insert(WatchHistory)
+            .values(user_id=user.id, video_id=v.id, last_position_seconds=0)
+            .on_conflict_do_nothing(constraint="pk_watch_history")
+        )
+        db.execute(stmt)
         db.commit()
-        db.refresh(wh)
+        wh = (
+            db.query(WatchHistory)
+            .filter(WatchHistory.user_id == user.id, WatchHistory.video_id == v.id)
+            .first()
+        )
 
-    position = int(wh.last_position_seconds or 0)
+    position = float(wh.last_position_seconds or 0)
     resume_from = position
     progress_percent: Optional[float] = None
 
@@ -219,7 +229,7 @@ def get_video(
         progress_percent = pct
         if (position / dur) >= 0.95:
             resume_from = 0
-            wh.last_position_seconds = 0
+            wh.last_position_seconds = 0.0
 
     # Always update last_watched_at on access
     wh.last_watched_at = func.now()

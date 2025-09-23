@@ -60,7 +60,7 @@ export default function VideoDetailPage() {
   useEffect(() => {
     if (!detail) return;
     const t = typeof detail.resume_from_seconds === 'number' ? detail.resume_from_seconds || 0 : 0;
-    resumeRef.current = Math.max(0, Math.floor(t));
+    resumeRef.current = Math.max(0, t);
     // allow first attach after new detail to apply resume time
     resumeAppliedRef.current = false;
   }, [detail]);
@@ -153,10 +153,11 @@ export default function VideoDetailPage() {
   }, [hlsSrc]);
 
   async function sendHeartbeat(pos: number) {
+    const position = Math.max(0, Math.round((pos || 0) * 100) / 100);
     const payload = {
       video_id: params.id,
-      position_seconds: Math.max(0, Math.floor(pos)),
-    } as const;
+      position_seconds: position,
+    };
     async function postOnce(token: string) {
       return fetch(`${API_BASE}/history/heartbeat`, {
         method: 'POST',
