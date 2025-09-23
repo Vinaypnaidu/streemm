@@ -3,7 +3,7 @@ import Navbar from "./components/Navbar";
 import { AuthProvider } from "./providers";
 import AuthGate from "./components/AuthGate";
 
-export const metadata = { title: "Reelay" };
+export const metadata = { title: "Streemm" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

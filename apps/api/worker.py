@@ -19,7 +19,7 @@ from storage import download_object, object_exists, build_hls_key, build_thumbna
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("worker")
 
-app = FastAPI(title="Reelay Worker")
+app = FastAPI(title="Streemm Worker")
 
 _stop_event = threading.Event()
 

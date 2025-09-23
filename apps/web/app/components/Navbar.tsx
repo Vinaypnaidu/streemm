@@ -30,7 +30,7 @@ export default function Navbar() {
               <svg width="20" height="20" viewBox="0 0 24 24" className="fill-neutral-200"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
             </button>
             <Link href="/" className="flex items-center gap-1 text-xl font-semibold tracking-tight hover:opacity-80 transition">
-              <span className="inline-block w-3 h-3 rounded-sm bg-violet-600 mr-1" />Reelay
+              <span className="inline-block w-3 h-3 rounded-sm bg-violet-600 mr-1" />Streemm
             </Link>
           </div>
 

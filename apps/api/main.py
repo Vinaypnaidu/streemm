@@ -12,7 +12,7 @@ from storage import ensure_bucket
 from routes_videos import router as videos_router
 from routes_history import router as history_router
 
-app = FastAPI(title="Reelay API")
+app = FastAPI(title="Streemm API")
 
 app.add_middleware(
     CORSMiddleware,

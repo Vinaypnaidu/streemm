@@ -26,7 +26,7 @@ function Card({ v, poster }: { v: VideoItem; poster?: string }) {
         <div className="w-9 h-9 rounded-full bg-neutral-700 shrink-0 grid place-items-center text-xs">R</div>
         <div className="min-w-0">
           <div className="font-medium leading-snug line-clamp-2">{v.original_filename}</div>
-          <div className="text-xs text-neutral-400 mt-1">Reelay • {new Date(v.created_at).toLocaleDateString()}</div>
+          <div className="text-xs text-neutral-400 mt-1">Streemm • {new Date(v.created_at).toLocaleDateString()}</div>
         </div>
         <button className="ml-auto self-start p-1.5 rounded-full hover:bg-neutral-800" aria-label="More">⋯</button>
       </div>
