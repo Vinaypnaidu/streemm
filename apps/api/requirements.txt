@@ -11,3 +11,7 @@ itsdangerous
 slowapi
 email-validator
 minio
+
+meilisearch
+faster-whisper
+openai

@@ -77,6 +77,9 @@ def build_hls_key(video_id: str, label: str, filename: str) -> str:
 def build_thumbnail_key(video_id: str) -> str:
     return f"thumbs/{video_id}/poster.jpg"
 
+def build_caption_key(video_id: str, lang: str = "en") -> str:
+    return f"captions/{video_id}/{lang}.vtt"
+
 def presign_put(bucket: str, key: str, expires_seconds: int) -> str:
     c = public_client() if settings.s3_public_endpoint else client()
     try:
@@ -117,6 +120,8 @@ def _guess_content_type(path: str) -> str:
         return "video/MP2T"
     if p.endswith(".mp4"):
         return "video/mp4"
+    if p.endswith(".vtt"):
+        return "text/vtt"
     if p.endswith(".jpg") or p.endswith(".jpeg"):
         return "image/jpeg"
     if p.endswith(".png"):

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Hls from 'hls.js';
 import { useAuth } from '../../providers/AuthProvider';
 
@@ -55,15 +55,20 @@ export default function VideoDetailPage() {
   useEffect(() => { load(); }, [params.id]);
 
   // CSRF is fetched lazily via getCsrf() when sending heartbeats
-
-  // Track resume time from detail
+  const searchParams = useSearchParams();
   useEffect(() => {
+    // Prefer ?t= from URL if present, else server-provided resume
+    const tParam = Number(searchParams.get('t'));
+    if (!Number.isNaN(tParam) && Number.isFinite(tParam) && tParam >= 0) {
+      resumeRef.current = Math.max(0, Math.floor(tParam));
+      resumeAppliedRef.current = false;
+      return;
+    }
     if (!detail) return;
     const t = typeof detail.resume_from_seconds === 'number' ? detail.resume_from_seconds || 0 : 0;
     resumeRef.current = Math.max(0, t);
-    // allow first attach after new detail to apply resume time
     resumeAppliedRef.current = false;
-  }, [detail]);
+  }, [detail, searchParams]);
 
   const poster = useMemo(
     () => detail?.assets.find(a => a.kind === 'thumbnail' && a.label === 'poster')?.public_url || undefined,
@@ -132,7 +137,7 @@ export default function VideoDetailPage() {
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
-      const onAttached = () => {
+      const onParsed = () => {
         try {
           const start = resumeAppliedRef.current ? prevTime : resumeRef.current;
           const isFirst = !resumeAppliedRef.current;
@@ -143,9 +148,9 @@ export default function VideoDetailPage() {
           }
         } catch {}
       };
-      hls.on(Hls.Events.MEDIA_ATTACHED, onAttached);
+      hls.on(Hls.Events.MANIFEST_PARSED, onParsed);
       return () => {
-        hls.off(Hls.Events.MEDIA_ATTACHED, onAttached);
+        hls.off(Hls.Events.MANIFEST_PARSED, onParsed);
         hls.destroy();
         hlsRef.current = null;
       };

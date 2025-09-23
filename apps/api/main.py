@@ -11,6 +11,10 @@ from routes_uploads import router as uploads_router
 from storage import ensure_bucket
 from routes_videos import router as videos_router
 from routes_history import router as history_router
+from routes_search import router as search_router
+from search import ensure_indexes
+from search import get_meili
+
 
 app = FastAPI(title="Streemm API")
 
@@ -26,11 +30,16 @@ app.include_router(auth_router)
 app.include_router(uploads_router)
 app.include_router(videos_router)
 app.include_router(history_router)
+app.include_router(search_router)
 
 @app.on_event("startup")
 def _startup():
     try:
         ensure_bucket()
+    except Exception:
+        pass
+    try:
+        ensure_indexes()
     except Exception:
         pass
 
@@ -51,6 +60,33 @@ def healthz():
     except Exception:
         ok_cache = False
     return {"ok": ok_db and ok_cache, "db": ok_db, "cache": ok_cache}
+
+@app.get("/debug/meili")
+def debug_meili():
+    c = get_meili()
+    if not c:
+        return {"error": "Meilisearch not available", "config_url": settings.meili_url}
+    try:
+        health = c.health()
+        indexes_result = c.get_indexes()
+        videos_info = None
+        chunks_info = None
+        try:
+            videos_info = c.get_index("videos").get_stats()
+        except Exception as e:
+            videos_info = {"error": str(e)}
+        try:
+            chunks_info = c.get_index("transcript_chunks").get_stats()
+        except Exception as e:
+            chunks_info = {"error": str(e)}
+        return {
+            "health": health,
+            "indexes": [idx.uid for idx in indexes_result.results],
+            "videos_index": videos_info,
+            "chunks_index": chunks_info
+        }
+    except Exception as e:
+        return {"error": f"Meilisearch error: {e}"}
 
 @app.get("/hello")
 def hello(name: str = "world"):

@@ -73,7 +73,7 @@ export default function HistoryPage() {
             return (
               <div key={it.video_id} className="w-full rounded-lg border border-neutral-800 bg-neutral-900">
                 <div className="flex gap-4 p-4">
-                  <Link href={`/videos/${it.video_id}`} className="shrink-0">
+                <Link href={`/videos/${it.video_id}?t=${Math.max(0, Math.floor(it.last_position_seconds || 0))}`} className="shrink-0">
                     {it.thumbnail_url ? (
                       <img
                         src={it.thumbnail_url}
@@ -87,11 +87,11 @@ export default function HistoryPage() {
                     )}
                   </Link>
                   <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/videos/${it.video_id}`}
-                      className="font-medium text-sm truncate mr-3 hover:underline"
-                      title={name}
-                    >
+                  <Link
+                    href={`/videos/${it.video_id}?t=${Math.max(0, Math.floor(it.last_position_seconds || 0))}`}
+                    className="font-medium text-sm truncate mr-3 hover:underline"
+                    title={name}
+                  >
                       {name}
                     </Link>
                     <div className="mt-3">

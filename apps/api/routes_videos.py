@@ -21,9 +21,11 @@ from schemas import (
     Ok,
     PublicVideoDetail,
 )
-from storage import build_raw_key, object_exists, build_public_url, build_thumbnail_key, delete_object, delete_prefix
+from storage import build_raw_key, object_exists, build_public_url, build_thumbnail_key, delete_object, delete_prefix, build_caption_key
 from jobs import enqueue_process_video
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from search import index_video_metadata, delete_video_from_search
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -125,6 +127,7 @@ def finalize_video(
         enqueue_process_video(str(existing.id), reason="finalize-idempotent")
         db.flush()
         db.refresh(existing)
+        index_video_metadata(existing)
         return _video_to_detail(existing)
 
     v = Video(
@@ -142,6 +145,7 @@ def finalize_video(
     db.refresh(v)
 
     enqueue_process_video(str(v.id), reason="finalize")
+    index_video_metadata(v)
     return _video_to_detail(v)
 
 @router.get("/my", response_model=PaginatedVideos)
@@ -268,9 +272,18 @@ def delete_video(
         # Thumbnail (by prefix)
         thumbs_prefix = f"thumbs/{video_id}/"
         delete_prefix(settings.s3_bucket, thumbs_prefix)
+        # Captions (by prefix)
+        captions_prefix = f"captions/{video_id}/"
+        delete_prefix(settings.s3_bucket, captions_prefix)
     except Exception:
         # Surface as 500 if storage deletion throws unexpectedly
         raise HTTPException(status_code=500, detail="Failed to delete from storage")
+
+    # Remove from Meilisearch
+    try:
+        delete_video_from_search(str(v.id))
+    except Exception:
+        pass
 
     # Delete DB rows (VideoAsset rows cascade)
     db.delete(v)

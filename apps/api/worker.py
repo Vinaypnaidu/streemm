@@ -14,7 +14,8 @@ from db import SessionLocal, healthcheck as db_health
 from models import Video, VideoAsset
 from jobs import QUEUE_KEY
 from config import settings
-from storage import download_object, object_exists, build_hls_key, build_thumbnail_key, upload_dir
+from storage import download_object, object_exists, build_hls_key, build_thumbnail_key, upload_dir, build_caption_key
+from search import index_video_metadata
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("worker")
@@ -175,6 +176,82 @@ def _generate_thumbnail(src_path: str, out_path: str) -> None:
         raise RuntimeError(f"ffmpeg(thumbnail) failed: code={res.returncode} err={res.stderr.strip()}")
     log.info(json.dumps({"step": "thumbnail", "duration_ms": dt}))
 
+def _write_vtt(segments, out_path: str) -> None:
+    # segments: iterable of {"start": float, "end": float, "text": str}
+    def _fmt(t: float) -> str:
+        h = int(t // 3600); m = int((t % 3600) // 60); s = t % 60
+        return f"{h:02d}:{m:02d}:{s:06.3f}".replace('.', ',')
+    lines = ["WEBVTT", ""]
+    for i, seg in enumerate(segments, 1):
+        start = float(seg.get("start", 0.0)); end = float(seg.get("end", 0.0))
+        text = (seg.get("text") or "").strip()
+        lines.append(str(i))
+        lines.append(f"{_fmt(start)} --> {_fmt(end)}")
+        lines.append(text)
+        lines.append("")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, 'w', encoding='utf-8') as f:
+        f.write("\n".join(lines))
+
+def _transcribe_with_faster_whisper(audio_path: str, model_name: str, language: str):
+    try:
+        from faster_whisper import WhisperModel
+    except Exception:
+        return None
+    try:
+        model = WhisperModel(model_name, device="cpu", compute_type="int8")
+        segments, _info = model.transcribe(audio_path, language=language)
+        out = []
+        for s in segments:
+            out.append({"start": float(s.start), "end": float(s.end), "text": (s.text or "").strip(), "lang": language})
+        return out
+    except Exception:
+        return None
+
+def _transcribe_with_openai(audio_path: str, language: str):
+    try:
+        from openai import OpenAI
+    except Exception:
+        return None
+    api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return None
+    try:
+        client = OpenAI(api_key=api_key)
+        with open(audio_path, 'rb') as f:
+            tr = client.audio.transcriptions.create(model="whisper-1", file=f, language=language)
+        # OpenAI returns text without timestamps; fall back to single segment
+        txt = (getattr(tr, 'text', None) or '').strip()
+        if not txt:
+            return None
+        return [{"start": 0.0, "end": 0.0, "text": txt, "lang": language}]
+    except Exception:
+        return None
+
+def _chunk_segments(segments, min_len: int = 80, max_len: int = 200):
+    chunks = []
+    cur_text = ""; cur_start = None; cur_end = None
+    for seg in segments:
+        text = (seg.get("text") or "").strip()
+        if not text:
+            continue
+        s = float(seg.get("start", 0.0)); e = float(seg.get("end", s))
+        if cur_start is None:
+            cur_start = s
+        candidate = (cur_text + " " + text).strip() if cur_text else text
+        if len(candidate) <= max_len:
+            cur_text = candidate; cur_end = e
+            if len(cur_text) >= min_len:
+                chunks.append({"start_seconds": cur_start, "end_seconds": cur_end, "text": cur_text, "lang": settings.whisper_lang})
+                cur_text = ""; cur_start = None; cur_end = None
+        else:
+            if cur_text:
+                chunks.append({"start_seconds": cur_start, "end_seconds": cur_end or s, "text": cur_text, "lang": settings.whisper_lang})
+            cur_text = text; cur_start = s; cur_end = e
+    if cur_text:
+        chunks.append({"start_seconds": cur_start or 0.0, "end_seconds": cur_end or (cur_start or 0.0), "text": cur_text, "lang": settings.whisper_lang})
+    return chunks
+
 def _upsert_asset_720p(db, video_id: uuid.UUID, playlist_key: str) -> None:
     existing = db.query(VideoAsset).filter(
         VideoAsset.video_id == video_id,
@@ -280,6 +357,10 @@ def process_video(video_id: str, reason: str) -> None:
                         v.duration_seconds = None
                     v.error = None
                     db.commit()
+                    try:
+                        index_video_metadata(v)
+                    except Exception:
+                        pass
 
             # HLS 720p: skip if playlist exists
             playlist_key = build_hls_key(video_id, "720p", "index.m3u8")
@@ -314,6 +395,46 @@ def process_video(video_id: str, reason: str) -> None:
             else:
                 log.info(json.dumps({"video_id": video_id, "step": "thumbnail", "skip": "exists"}))
 
+            # Transcription (optional)
+            caption_key = build_caption_key(video_id, settings.whisper_lang)
+            has_vtt, _ = object_exists(settings.s3_bucket, caption_key)
+            if settings.whisper_enabled and not has_vtt:
+                # Extract audio (wav) for better compatibility
+                audio_path = os.path.join(tmpd, "audio.wav")
+                try:
+                    cmd = [
+                        settings.ffmpeg_bin, "-y",
+                        "-i", local_raw,
+                        "-ac", "1",
+                        "-ar", "16000",
+                        audio_path,
+                    ]
+                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+                    if res.returncode != 0:
+                        raise RuntimeError(f"ffmpeg(audio) failed: code={res.returncode} err={res.stderr.strip()}")
+
+                    segments = _transcribe_with_faster_whisper(audio_path, settings.whisper_model, settings.whisper_lang)
+                    if segments is None and settings.whisper_use_openai_fallback:
+                        segments = _transcribe_with_openai(audio_path, settings.whisper_lang)
+
+                    if segments:
+                        # Write VTT
+                        vtt_local = os.path.join(tmpd, "captions.vtt")
+                        _write_vtt(segments, vtt_local)
+                        from storage import client, _guess_content_type
+                        c = client()
+                        c.fput_object(settings.s3_bucket, caption_key, vtt_local, content_type=_guess_content_type(vtt_local))
+
+                        # Index transcript chunks in Meili
+                        from search import index_transcript_chunks
+                        chunks = _chunk_segments(segments)
+                        try:
+                            index_transcript_chunks(video_id, chunks)
+                        except Exception:
+                            pass
+                except Exception:
+                    log.exception("transcription_failed")
+
         # Upsert asset records
         with SessionLocal() as db:
             _upsert_asset_720p(db, uuid.UUID(video_id), playlist_key)
@@ -334,6 +455,10 @@ def process_video(video_id: str, reason: str) -> None:
                     # Keep processing if partial; retries/idempotency will fill in
                     v.status = "processing"
                 db.commit()
+                try:
+                    index_video_metadata(v)
+                except Exception:
+                    pass
 
         redis_client.delete(_attempts_key(video_id))
         log.info(json.dumps({"video_id": video_id, "step": "finalize", "ready": ok720 and ok480 and okthumb}))

@@ -14,6 +14,7 @@ services:
       - minio_data:/data
       - minio_config:/root/.minio
     restart: unless-stopped
+    
   db:
     image: postgres:16-alpine
     container_name: streemm_db
@@ -42,6 +43,24 @@ services:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  
+  meilisearch:
+    image: getmeili/meilisearch:v1.16
+    container_name: streemm_meili
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_meili_key}
+      MEILI_LOG_LEVEL: info
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7700/health | grep -q 'available'"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -76,6 +95,9 @@ services:
       S3_REGION: us-east-1
       S3_BUCKET: media
       S3_USE_SSL: "false"
+      # Meilisearch
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_meili_key}
     depends_on:
       db:
         condition: service_healthy
@@ -118,6 +140,9 @@ services:
       FFPROBE_TIMEOUT_SECONDS: 30
       WORKER_LOCK_TTL_MS: 900000
       WORKER_BACKOFF_SECONDS: 30,120,300
+      # Meilisearch
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_meili_key}
     depends_on:
       api:
         condition: service_started
@@ -154,3 +179,4 @@ volumes:
   web_next:
   minio_data:
   minio_config:
+  meili_data:

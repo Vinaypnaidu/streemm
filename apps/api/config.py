@@ -43,4 +43,19 @@ class Settings:
         backoff_csv = os.getenv("WORKER_BACKOFF_SECONDS", "30,120,300")
         self.worker_backoff_seconds = [int(x.strip()) for x in backoff_csv.split(",") if x.strip()]
 
+        # Meilisearch
+        self.meili_url = os.getenv("MEILI_URL", "http://localhost:7700")
+        self.meili_master_key = os.getenv("MEILI_MASTER_KEY", "")
+
+        # Search thresholds
+        self.min_meta_coverage = float(os.getenv("MIN_META_COVERAGE", "0.5"))
+        self.min_transcript_coverage = float(os.getenv("MIN_TRANSCRIPT_COVERAGE", "0.5"))
+
+        # Transcription / Whisper settings
+        self.whisper_enabled = os.getenv("WHISPER_ENABLED", "true").lower() == "true"
+        self.whisper_model = os.getenv("WHISPER_MODEL", "base.en")
+        self.whisper_lang = os.getenv("WHISPER_LANG", "en")
+        self.whisper_use_openai_fallback = os.getenv("WHISPER_USE_OPENAI_FALLBACK", "true").lower() == "true"
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+
 settings = Settings()

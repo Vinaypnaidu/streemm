@@ -4,11 +4,14 @@ import Link from 'next/link';
 import { useAuth } from '../providers/AuthProvider';
 import { useEffect, useRef, useState } from 'react';
 import Sidebar from './Sidebar';
+import { useRouter } from 'next/navigation';
 
 export default function Navbar() {
   const { me, loading, logout } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState('');
+  const router = useRouter();
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -19,6 +22,13 @@ export default function Navbar() {
   }, []);
 
   if (loading || !me) return null;
+
+  function onSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    router.push(`/search?q=${encodeURIComponent(q)}`);
+  }
 
   return (
     <>
@@ -36,9 +46,11 @@ export default function Navbar() {
 
           {/* Center: search */}
           <div className="flex-1 flex justify-center">
-            <form onSubmit={(e) => e.preventDefault()} className="hidden sm:flex w-full max-w-3xl">
+            <form onSubmit={onSearchSubmit} className="hidden sm:flex w-full max-w-3xl">
               <input
                 placeholder="Search"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
                 className="w-full rounded-l-full border border-neutral-700 bg-neutral-900 text-neutral-100 px-4 py-2 focus:outline-none focus:ring-1 focus:ring-neutral-400"
               />
               <button
