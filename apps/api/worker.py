@@ -274,7 +274,10 @@ def process_video(video_id: str, reason: str) -> None:
                 v = db.get(Video, uuid.UUID(video_id))
                 if v:
                     v.probe = probe
-                    v.duration_seconds = str(duration) if duration is not None else None
+                    try:
+                        v.duration_seconds = float(duration) if duration is not None else None
+                    except Exception:
+                        v.duration_seconds = None
                     v.error = None
                     db.commit()
 

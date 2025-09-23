@@ -46,7 +46,7 @@ def _video_to_detail(v: Video) -> VideoDetail:
         description=v.description or "",
         original_filename=v.original_filename,
         storage_key_raw=v.storage_key_raw,
-        duration_seconds=v.duration_seconds,
+        duration_seconds=float(v.duration_seconds) if v.duration_seconds is not None else None,
         checksum_sha256=v.checksum_sha256,
         probe=v.probe,
         error=v.error,
@@ -78,7 +78,7 @@ def _video_to_public_detail(
         title=v.title or "",
         description=v.description or "",
         original_filename=v.original_filename,
-        duration_seconds=v.duration_seconds,
+        duration_seconds=float(v.duration_seconds) if v.duration_seconds is not None else None,
         error=v.error,
         created_at=v.created_at,
         assets=assets_out,
@@ -212,11 +212,7 @@ def get_video(
     resume_from = position
     progress_percent: Optional[float] = None
 
-    dur = None
-    try:
-        dur = float(v.duration_seconds) if v.duration_seconds is not None else None
-    except Exception:
-        dur = None
+    dur = v.duration_seconds if v.duration_seconds is not None else None
 
     if dur and dur > 0:
         pct = max(0.0, min(100.0, (position / dur) * 100.0))

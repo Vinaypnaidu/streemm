@@ -85,11 +85,7 @@ def list_history(
         thumb_url = build_public_url(thumb_key) if has_thumb else None
 
         # Duration and progress
-        dur: Optional[float] = None
-        try:
-            dur = float(v.duration_seconds) if v.duration_seconds is not None else None
-        except Exception:
-            dur = None
+        dur: Optional[float] = v.duration_seconds if v.duration_seconds is not None else None
         progress = None
         if dur and dur > 0:
             progress = max(0.0, min(100.0, (float(wh.last_position_seconds) / dur) * 100.0))

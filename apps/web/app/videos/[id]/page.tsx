@@ -18,7 +18,7 @@ type Detail = {
   assets: Asset[];
   resume_from_seconds?: number | null;
   progress_percent?: number | null;
-  duration_seconds?: string | null;
+  duration_seconds?: number | null;
 };
 
 export default function VideoDetailPage() {

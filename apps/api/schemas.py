@@ -61,7 +61,7 @@ class VideoDetail(BaseModel):
     title: str
     description: str
     storage_key_raw: str
-    duration_seconds: Optional[str] = None
+    duration_seconds: Optional[float] = None
     checksum_sha256: Optional[str] = None
     probe: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
@@ -74,7 +74,7 @@ class PublicVideoDetail(BaseModel):
     original_filename: str
     title: str
     description: str
-    duration_seconds: Optional[str] = None
+    duration_seconds: Optional[float] = None
     error: Optional[str] = None
     created_at: datetime
     assets: List[VideoAssetOut] = []

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Integer, func
+from sqlalchemy import Column, String, DateTime, Integer, Float, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import MetaData
@@ -46,7 +46,7 @@ class Video(Base):
 
     status = Column(String, nullable=False, default="uploaded")  # uploaded|processing|ready|failed
     probe = Column(JSONB, nullable=True)
-    duration_seconds = Column(String, nullable=True)  # can be refined to numeric/float if preferred
+    duration_seconds = Column(Float, nullable=True)
     checksum_sha256 = Column(String, nullable=True)
     error = Column(String, nullable=True)
 
