@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from cache import redis_client, healthcheck as cache_health
 from db import SessionLocal, healthcheck as db_health
 from models import Video, VideoAsset
-from jobs import QUEUE_KEY
+from jobs import QUEUE_KEY, DLQ_KEY, enqueue_notify_video_ready
 from config import settings
 from storage import download_object, object_exists, build_hls_key, build_thumbnail_key, upload_dir, build_caption_key
 from search import index_video_metadata
@@ -448,13 +448,22 @@ def process_video(video_id: str, reason: str) -> None:
         with SessionLocal() as db:
             v = db.get(Video, uuid.UUID(video_id))
             if v:
-                if ok720 and ok480 and okthumb:
+                will_be_ready = (ok720 and ok480 and okthumb)
+                prev_status = v.status
+                if will_be_ready:
                     v.status = "ready"
                     v.error = None
                 else:
-                    # Keep processing if partial; retries/idempotency will fill in
                     v.status = "processing"
                 db.commit()
+
+                # Enqueue notification exactly once on transition to ready
+                if will_be_ready and prev_status != "ready" and (v.notified_at is None):
+                    try:
+                        enqueue_notify_video_ready(str(v.id))
+                    except Exception:
+                        pass
+
                 try:
                     index_video_metadata(v)
                 except Exception:
@@ -478,6 +487,18 @@ def process_video(video_id: str, reason: str) -> None:
                     v.status = "failed"
                     v.error = str(e)
                     db.commit()
+                    try:
+                        print(f"Pushing to DLQ: {video_id}")
+                        redis_client.lpush(DLQ_KEY, json.dumps({
+                            "video_id": video_id,
+                            "error": str(e),
+                            "attempts": attempts,
+                            "reason": reason,
+                            "ts": int(time.time())
+                        }))
+                        redis_client.ltrim(DLQ_KEY, 0, 9999)
+                    except Exception:
+                        pass
             log.error(json.dumps({"video_id": video_id, "step": "failed_terminal", "error": str(e)}))
     finally:
         refresher_stop.set()

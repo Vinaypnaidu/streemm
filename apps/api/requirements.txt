@@ -1,7 +1,6 @@
 fastapi
 uvicorn[standard]
 python-dotenv
-
 sqlalchemy[asyncio]
 alembic
 psycopg[binary]
@@ -11,7 +10,7 @@ itsdangerous
 slowapi
 email-validator
 minio
-
 meilisearch
 faster-whisper
 openai
+aiosmtplib

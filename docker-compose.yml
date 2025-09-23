@@ -66,6 +66,14 @@ services:
       retries: 20
     restart: unless-stopped
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: streemm_mailpit
+    ports:
+      - "1025:1025"    # SMTP
+      - "8025:8025"    # Web UI
+    restart: unless-stopped
+
   api:
     build:
       context: ./apps/api
@@ -151,6 +159,42 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_started
+    restart: unless-stopped
+
+  notifier:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    command: sh -c "uvicorn notifier:app --host 0.0.0.0 --port 9200 --reload"
+    ports:
+      - "9200:9200"
+    volumes:
+      - ./apps/api:/app
+    environment:
+      DATABASE_URL: postgresql+psycopg://streemm:streemm@db:5432/streemm_dev
+      REDIS_URL: redis://redis:6379/0
+      ENV: development
+      SESSION_COOKIE_NAME: sid
+      SESSION_TTL_SECONDS: 604800
+      SESSION_SECRET: ${SESSION_SECRET:-changeme}
+      PYTHONUNBUFFERED: "1"
+      # Email
+      EMAIL_ENABLED: "true"
+      EMAIL_FROM: dev@streemm.local
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_STARTTLS: "false"
+      SMTP_SSL: "false"
+      PUBLIC_WEB_BASE_URL: http://localhost:3000
+    depends_on:
+      api:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
         condition: service_started
     restart: unless-stopped
 

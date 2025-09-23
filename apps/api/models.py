@@ -54,6 +54,7 @@ class Video(Base):
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+    notified_at = Column(DateTime(timezone=True), nullable=True)
 
     assets = relationship("VideoAsset", back_populates="video", cascade="all, delete-orphan")
 

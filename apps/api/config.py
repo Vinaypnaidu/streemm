@@ -58,4 +58,17 @@ class Settings:
         self.whisper_use_openai_fallback = os.getenv("WHISPER_USE_OPENAI_FALLBACK", "true").lower() == "true"
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
+        # Email / SMTP
+        self.email_enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
+        self.email_from = os.getenv("EMAIL_FROM", "no-reply@streemm.local")
+        self.smtp_host = os.getenv("SMTP_HOST", "localhost")
+        self.smtp_port = int(os.getenv("SMTP_PORT", "1025"))
+        self.smtp_username = os.getenv("SMTP_USERNAME", "")
+        self.smtp_password = os.getenv("SMTP_PASSWORD", "")
+        self.smtp_starttls = os.getenv("SMTP_STARTTLS", "false").lower() == "true"
+        self.smtp_ssl = os.getenv("SMTP_SSL", "false").lower() == "true"
+
+        # Public base URL (for links in emails)
+        self.public_web_base_url = os.getenv("PUBLIC_WEB_BASE_URL", "http://localhost:3000")
+
 settings = Settings()
