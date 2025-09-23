@@ -1,7 +1,7 @@
 services:
   minio:
     image: minio/minio:latest
-    container_name: reelay_minio
+    container_name: streemm_minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
@@ -16,17 +16,17 @@ services:
     restart: unless-stopped
   db:
     image: postgres:16-alpine
-    container_name: reelay_db
+    container_name: streemm_db
     environment:
-      POSTGRES_USER: reelay
-      POSTGRES_PASSWORD: reelay
-      POSTGRES_DB: reelay_dev
+      POSTGRES_USER: streemm
+      POSTGRES_PASSWORD: streemm
+      POSTGRES_DB: streemm_dev
     ports:
       - "5432:5432" # optional: for local psql tools
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U reelay -d reelay_dev"]
+      test: ["CMD-SHELL", "pg_isready -U streemm -d streemm_dev"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -34,7 +34,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: reelay_redis
+    container_name: streemm_redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379" # optional: for local redis-cli
@@ -58,7 +58,7 @@ services:
       - ./apps/api:/app
     environment:
       # Container networking URLs
-      DATABASE_URL: postgresql+psycopg://reelay:reelay@db:5432/reelay_dev
+      DATABASE_URL: postgresql+psycopg://streemm:streemm@db:5432/streemm_dev
       REDIS_URL: redis://redis:6379/0
       # App settings
       ENV: development
@@ -95,7 +95,7 @@ services:
     volumes:
       - ./apps/api:/app
     environment:
-      DATABASE_URL: postgresql+psycopg://reelay:reelay@db:5432/reelay_dev
+      DATABASE_URL: postgresql+psycopg://streemm:streemm@db:5432/streemm_dev
       REDIS_URL: redis://redis:6379/0
       ENV: development
       SESSION_COOKIE_NAME: sid

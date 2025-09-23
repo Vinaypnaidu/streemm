@@ -1,5 +1,5 @@
 {
-    "name": "@reelay/web",
+    "name": "@streemm/web",
     "private": true,
     "type": "module",
     "scripts": {

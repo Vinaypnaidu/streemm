@@ -8,7 +8,7 @@ class Settings:
         self.env = os.getenv("ENV", "development")
         self.database_url = os.getenv(
             "DATABASE_URL",
-            "postgresql+psycopg://reelay:reelay@localhost:5432/reelay_dev",
+            "postgresql+psycopg://streemm:streemm@localhost:5432/streemm_dev",
         )
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.session_secret = os.getenv("SESSION_SECRET", "changeme")
