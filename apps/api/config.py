@@ -48,8 +48,8 @@ class Settings:
         self.meili_master_key = os.getenv("MEILI_MASTER_KEY", "")
 
         # Search thresholds
-        self.min_meta_coverage = float(os.getenv("MIN_META_COVERAGE", "0.5"))
-        self.min_transcript_coverage = float(os.getenv("MIN_TRANSCRIPT_COVERAGE", "0.5"))
+        self.min_meta_coverage = float(os.getenv("MIN_META_COVERAGE", "0.0"))
+        self.min_transcript_coverage = float(os.getenv("MIN_TRANSCRIPT_COVERAGE", "0.25"))
 
         # Transcription / Whisper settings
         self.whisper_enabled = os.getenv("WHISPER_ENABLED", "true").lower() == "true"

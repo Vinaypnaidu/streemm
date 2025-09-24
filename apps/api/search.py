@@ -71,7 +71,7 @@ def ensure_indexes() -> None:
     try:
         task = c.index("videos").update_settings({
             "searchableAttributes": ["title", "description"],
-            "filterableAttributes": ["created_at", "user_id"],
+            "filterableAttributes": ["created_at", "user_id", "status"],
             "sortableAttributes": ["created_at", "duration_seconds"],
             "typoTolerance": { "enabled": True },
         })
@@ -109,6 +109,7 @@ def index_video_metadata(video) -> None:
         "created_at": video.created_at.isoformat() if getattr(video, "created_at", None) else None,
         "duration_seconds": float(video.duration_seconds) if video.duration_seconds is not None else 0,
         "thumbnail_url": thumb_url,
+        "status": (video.status or "uploaded"),
     }
     
     try:

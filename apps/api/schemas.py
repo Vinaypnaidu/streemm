@@ -102,3 +102,15 @@ class PaginatedHistory(BaseModel):
 class PaginatedVideos(BaseModel):
     items: List[VideoOut]
     next_offset: Optional[int] = None
+
+class HomeFeedItem(BaseModel):
+    id: str
+    title: str
+    description: str
+    thumbnail_url: Optional[str] = None
+    duration_seconds: Optional[float] = None
+    progress_percent: Optional[float] = None
+
+class HomeFeedResponse(BaseModel):
+    items: List[HomeFeedItem]
+    source: str

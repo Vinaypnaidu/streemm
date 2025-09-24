@@ -12,6 +12,7 @@ from storage import ensure_bucket
 from routes_videos import router as videos_router
 from routes_history import router as history_router
 from routes_search import router as search_router
+from routes_homefeed import router as homefeed_router
 from search import ensure_indexes
 from search import get_meili
 
@@ -31,6 +32,7 @@ app.include_router(uploads_router)
 app.include_router(videos_router)
 app.include_router(history_router)
 app.include_router(search_router)
+app.include_router(homefeed_router)
 
 @app.on_event("startup")
 def _startup():
