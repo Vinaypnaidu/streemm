@@ -10,7 +10,7 @@ itsdangerous
 slowapi
 email-validator
 minio
-meilisearch
+opensearch-py
 faster-whisper
 openai
 aiosmtplib

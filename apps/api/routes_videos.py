@@ -279,7 +279,7 @@ def delete_video(
         # Surface as 500 if storage deletion throws unexpectedly
         raise HTTPException(status_code=500, detail="Failed to delete from storage")
 
-    # Remove from Meilisearch
+    # Remove from search index
     try:
         delete_video_from_search(str(v.id))
     except Exception:

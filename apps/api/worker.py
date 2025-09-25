@@ -360,7 +360,7 @@ def process_video(video_id: str, reason: str) -> None:
                     try:
                         index_video_metadata(v)
                     except Exception:
-                        pass
+                        log.exception("index_video_metadata_failed")
 
             # HLS 720p: skip if playlist exists
             playlist_key = build_hls_key(video_id, "720p", "index.m3u8")
@@ -425,13 +425,13 @@ def process_video(video_id: str, reason: str) -> None:
                         c = client()
                         c.fput_object(settings.s3_bucket, caption_key, vtt_local, content_type=_guess_content_type(vtt_local))
 
-                        # Index transcript chunks in Meili
+                        # Index transcript chunks in OpenSearch
                         from search import index_transcript_chunks
                         chunks = _chunk_segments(segments)
                         try:
                             index_transcript_chunks(video_id, chunks)
                         except Exception:
-                            pass
+                            log.exception("index_transcript_chunks_failed")
                 except Exception:
                     log.exception("transcription_failed")
 
@@ -467,7 +467,7 @@ def process_video(video_id: str, reason: str) -> None:
                 try:
                     index_video_metadata(v)
                 except Exception:
-                    pass
+                    log.exception("index_video_metadata_failed_finalize")
 
         redis_client.delete(_attempts_key(video_id))
         log.info(json.dumps({"video_id": video_id, "step": "finalize", "ready": ok720 and ok480 and okthumb}))

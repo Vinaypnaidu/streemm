@@ -13,8 +13,7 @@ from routes_videos import router as videos_router
 from routes_history import router as history_router
 from routes_search import router as search_router
 from routes_homefeed import router as homefeed_router
-from search import ensure_indexes
-from search import get_meili
+from search import ensure_indexes, get_client, VIDEOS_INDEX, TRANSCRIPTS_INDEX
 
 
 app = FastAPI(title="Streemm API")
@@ -63,32 +62,26 @@ def healthz():
         ok_cache = False
     return {"ok": ok_db and ok_cache, "db": ok_db, "cache": ok_cache}
 
-@app.get("/debug/meili")
-def debug_meili():
-    c = get_meili()
-    if not c:
-        return {"error": "Meilisearch not available", "config_url": settings.meili_url}
+@app.get("/search/debug")
+def search_debug():
+    client = get_client()
+    if not client:
+        return {"ok": False, "error": "OpenSearch client unavailable"}
     try:
-        health = c.health()
-        indexes_result = c.get_indexes()
-        videos_info = None
-        chunks_info = None
-        try:
-            videos_info = c.get_index("videos").get_stats()
-        except Exception as e:
-            videos_info = {"error": str(e)}
-        try:
-            chunks_info = c.get_index("transcript_chunks").get_stats()
-        except Exception as e:
-            chunks_info = {"error": str(e)}
-        return {
-            "health": health,
-            "indexes": [idx.uid for idx in indexes_result.results],
-            "videos_index": videos_info,
-            "chunks_index": chunks_info
+        cluster = client.cluster.health()
+        indices = client.cat.indices(format="json")
+        stats = {
+            "videos": client.indices.get(VIDEOS_INDEX).get(VIDEOS_INDEX) if client.indices.exists(VIDEOS_INDEX) else None,
+            "transcript_chunks": client.indices.get(TRANSCRIPTS_INDEX).get(TRANSCRIPTS_INDEX) if client.indices.exists(TRANSCRIPTS_INDEX) else None,
         }
-    except Exception as e:
-        return {"error": f"Meilisearch error: {e}"}
+        return {
+            "ok": True,
+            "cluster": cluster,
+            "indices": indices,
+            "stats": stats,
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 @app.get("/hello")
 def hello(name: str = "world"):

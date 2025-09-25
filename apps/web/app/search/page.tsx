@@ -25,7 +25,7 @@ type TranscriptItem = {
 };
 
 type SearchResponse = {
-  meili_ok: boolean;
+  search_ok: boolean;
   meta: { items: MetaItem[]; estimated_total: number; next_offset?: number | null };
   transcript: { items: TranscriptItem[]; estimated_total: number; next_offset?: number | null };
 };

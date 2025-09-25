@@ -1,37 +1,71 @@
 # apps/api/routes_search.py
 from __future__ import annotations
 
-import re
 import logging
-from typing import Dict, List, Optional, Set, Tuple
+import re
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from db import get_db
 from models import User, Video
 from session import get_current_user
-from config import settings
-from search import get_meili
+from search import get_client, ensure_indexes, VIDEOS_INDEX, TRANSCRIPTS_INDEX
 from storage import build_thumbnail_key, build_public_url
 
 router = APIRouter(prefix="/search", tags=["search"])
 log = logging.getLogger("routes_search")
 
-_word_re = re.compile(r"[A-Za-z0-9_]+")
+STOPWORDS: Set[str] = {
+    "a","an","the","to","is","in","on","of","for","and","or","as","at","be","by","with","from",
+    "this","that","it","you","your","are","was","were","will","can","not","we","our","they","them",
+    "their","i","me","my","mine","video","videos","watch","watched",
+}
+_MAX_SPAN_WINDOWS = 8
 
-def _terms(q: str) -> Set[str]:
-    return {t.lower() for t in _word_re.findall(q or "") if t.strip()}
 
-def _coverage(text: str, terms: Set[str]) -> float:
-    if not terms:
-        return 0.0
-    txt = (text or "").lower()
-    matched = 0
-    for t in terms:
-        if t and t in txt:
-            matched += 1
-    return matched / max(1, len(terms))
+def _normalize_tokens(text: str) -> List[str]:
+    """Lowercase the query and strip punctuation."""
+    return [t for t in re.sub(r"[^\w\s']", " ", text.lower()).split() if t]
+
+
+def _build_meta_query(q: str, limit: int, offset: int) -> Dict[str, Any]:
+    return {
+        "from": offset,
+        "size": limit,
+        "query": {
+            "multi_match": {
+                "query": q,
+                "fields": ["title", "description"],
+                "type": "best_fields",
+            }
+        },
+        "highlight": {
+            "pre_tags": ["<em>"],
+            "post_tags": ["</em>"],
+            "fields": {"title": {}, "description": {}},
+        },
+    }
+
+
+def _iter_span_windows(tokens: List[str]) -> List[Tuple[List[str], float]]:
+    """Return a capped list of (window_tokens, base_boost) pairs for span_near boosters."""
+    def sliding(seq: List[str], k: int) -> List[List[str]]:
+        if len(seq) < k:
+            return []
+        return [seq[i : i + k] for i in range(0, len(seq) - k + 1)]
+
+    windows: List[Tuple[List[str], float]] = []
+    for k, base_boost in ((5, 1.5), (4, 1.2)):
+        wins = sliding(tokens, k)
+        if wins:
+            take = max(1, min(len(wins), _MAX_SPAN_WINDOWS // 2))
+            idxs = [round(i * (len(wins) - 1) / (take - 1)) if take > 1 else 0 for i in range(take)]
+            for idx in idxs:
+                windows.append((wins[idx], base_boost))
+    return windows
+
 
 @router.get("")
 def search(
@@ -44,15 +78,19 @@ def search(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    c = get_meili()
-    if not c:
+    client = get_client()
+    if not client:
         return {
-            "meili_ok": False,
+            "search_ok": False,
             "meta": {"items": [], "estimated_total": 0, "next_offset": None},
             "transcript": {"items": [], "estimated_total": 0, "next_offset": None},
         }
 
-    terms = _terms(q)
+    ensure_indexes()
+
+    tokens = _normalize_tokens(q)
+    word_count = len(tokens)
+    full_phrase = " ".join(tokens)
 
     # --------------------
     # Metadata search
@@ -61,38 +99,30 @@ def search(
     meta_est_total = 0
     meta_next_offset: Optional[int] = None
     try:
-        res_meta = c.index("videos").search(
-            q,
-            {
-                "limit": max(1, min(100, limit_meta)),
-                "offset": max(0, offset_meta),
-                "showMatchesPosition": True,
-                "attributesToHighlight": ["title", "description"],
-                "highlightPreTag": "<em>",
-                "highlightPostTag": "</em>",
-            },
-        )
-        hits = res_meta.get("hits", [])
+        meta_limit = max(1, min(100, limit_meta))
+        meta_offset = max(0, offset_meta)
+        body = _build_meta_query(q, meta_limit, meta_offset)
+        res_meta = client.search(index=VIDEOS_INDEX, body=body)
+        hits = res_meta.get("hits", {}).get("hits", [])
         for h in hits:
-            title = h.get("title") or ""
-            desc = h.get("description") or ""
-            cov = _coverage(f"{title} {desc}", terms)
-            if cov >= settings.min_meta_coverage:
-                fmt = h.get("_formatted") or {}
-                meta_items.append(
-                    {
-                        "video_id": h.get("id"),
-                        "title_html": fmt.get("title", title),
-                        "description_html": fmt.get("description", desc),
-                        "thumbnail_url": h.get("thumbnail_url"),
-                        "created_at": h.get("created_at"),
-                        "duration_seconds": h.get("duration_seconds"),
-                        "score": h.get("_rankingScore") or h.get("_semanticScore") or None,
-                    }
-                )
-        meta_est_total = res_meta.get("estimatedTotalHits", 0)
-        # Pagination hint (approx; filtering may hide some hits)
-        meta_next_offset = (offset_meta + limit_meta) if (meta_est_total > offset_meta + limit_meta) else None
+            src = h.get("_source", {})
+            highlight = h.get("highlight") or {}
+            title_html = highlight.get("title", [src.get("title") or ""])
+            desc_html = highlight.get("description", [src.get("description") or ""])
+            meta_items.append(
+                {
+                    "video_id": h.get("_id"),
+                    "title_html": title_html[0] if title_html else (src.get("title") or ""),
+                    "description_html": desc_html[0] if desc_html else (src.get("description") or ""),
+                    "thumbnail_url": src.get("thumbnail_url"),
+                    "created_at": src.get("created_at"),
+                    "duration_seconds": src.get("duration_seconds"),
+                    "score": h.get("_score"),
+                }
+            )
+        total_meta = res_meta.get("hits", {}).get("total", {})
+        meta_est_total = int(total_meta.get("value", 0))
+        meta_next_offset = (meta_offset + meta_limit) if (meta_est_total > meta_offset + meta_limit) else None
     except Exception as e:
         log.error(f"Metadata search failed: {e}")
 
@@ -103,57 +133,144 @@ def search(
     tr_est_total = 0
     tr_next_offset: Optional[int] = None
     first_by_video: Dict[str, Tuple[float, Dict]] = {}
-    try:
-        params = {
-            "limit": max(1, min(1000, limit_transcript)),   # allow enough hits to group
-            "offset": max(0, offset_transcript),
-            "showMatchesPosition": True,
-            "attributesToHighlight": ["text"],
-            "highlightPreTag": "<em>",
-            "highlightPostTag": "</em>",
-        }
-        if lang:
-            params["filter"] = f'lang = "{lang}"'
-        res_tr = c.index("transcript_chunks").search(q, params)
-        hits_tr = res_tr.get("hits", [])
-        for h in hits_tr:
-            vid = h.get("video_id")
-            text = h.get("text") or ""
-            cov = _coverage(text, terms)
-            if cov < settings.min_transcript_coverage:
-                continue
-            start = float(h.get("start_seconds") or 0.0)
-            if vid not in first_by_video or start < first_by_video[vid][0]:
-                first_by_video[vid] = (start, h)
-        # Hydrate titles/thumbnails from DB
-        video_ids = list(first_by_video.keys())
-        if video_ids:
-            rows = db.query(Video).filter(Video.id.in_(video_ids)).all()
-            info: Dict[str, Dict] = {}
-            for v in rows:
-                thumb_url = build_public_url(build_thumbnail_key(str(v.id)))
-                info[str(v.id)] = {
-                    "title": (v.title or "").strip() or v.original_filename,
-                    "thumbnail_url": thumb_url,
-                }
-            for vid, (start, h) in first_by_video.items():
-                fmt = h.get("_formatted") or {}
-                tr_items.append(
+
+    if word_count >= 3:
+        try:
+            tr_limit = max(1, min(1000, limit_transcript))
+            tr_offset = max(0, offset_transcript)
+
+            if 3 <= word_count <= 5:
+                msm = "70%"
+            elif word_count >= 6:
+                msm = "50%"
+
+            match_query = {
+                "query": full_phrase,
+                "operator": "or",
+                "minimum_should_match": msm,
+                "auto_generate_synonyms_phrase_query": False,
+            }
+
+            should_clauses: List[Dict[str, Any]] = []
+            # Reward long in-order runs (5-grams, then 4-grams) with span_near boosters.
+            for i, (window, base_boost) in enumerate(_iter_span_windows(tokens)):
+                slop_val = 2 if len(window) >= 5 else 1
+                should_clauses.append(
                     {
-                        "video_id": vid,
-                        "title": info.get(vid, {}).get("title", ""),
-                        "thumbnail_url": info.get(vid, {}).get("thumbnail_url"),
-                        "progress_seconds": start,
-                        "snippet_html": fmt.get("text", h.get("text") or ""),
+                        "span_near": {
+                            "clauses": [{"span_term": {"text": term}} for term in window],
+                            "in_order": True,
+                            "slop": slop_val,
+                            "boost": round(base_boost * (0.97 ** i), 3),
+                        }
                     }
                 )
-        tr_est_total = res_tr.get("estimatedTotalHits", 0)
-        tr_next_offset = (offset_transcript + limit_transcript) if (tr_est_total > offset_transcript + limit_transcript) else None
-    except Exception as e:
-        log.error(f"Transcript search failed: {e}")
+
+            bool_query: Dict[str, Any] = {
+                "must": [
+                    {
+                        "match": {
+                            "text": match_query,
+                        }
+                    }
+                ]
+            }
+            if should_clauses:
+                bool_query["should"] = should_clauses
+
+            content_terms = [t for t in tokens if t not in STOPWORDS and len(t) > 2]
+            if content_terms:
+                # Soft guard: require at least one non-glue term to match using a dis_max term set.
+                bool_query.setdefault("should", []).append(
+                    {
+                        "dis_max": {
+                            "queries": [{"term": {"text": term}} for term in content_terms],
+                            "tie_breaker": 0.0,
+                        }
+                    }
+                )
+                bool_query["minimum_should_match"] = 1
+            if lang:
+                bool_query.setdefault("filter", []).append({"term": {"lang": lang}})
+
+            body: Dict[str, Any] = {
+                "query": {"bool": bool_query},
+                "highlight": {
+                    "pre_tags": ["<em>"],
+                    "post_tags": ["</em>"],
+                    "fields": {
+                        "text": {
+                            "number_of_fragments": 1,
+                            "fragment_size": 180,
+                        }
+                    },
+                },
+            }
+            if tokens:
+                # Final tie-break: rescore top hits with the full phrase to push near-exact matches to the top.
+                body["rescore"] = {
+                    "window_size": 200,
+                    "query": {
+                        "rescore_query": {
+                            "match_phrase": {
+                                "text": {
+                                    "query": full_phrase,
+                                    "slop": 1,
+                                }
+                            }
+                        },
+                        "query_weight": 1.0,
+                        "rescore_query_weight": 2.0,
+                    },
+                }
+
+            res_tr = client.search(
+                index=TRANSCRIPTS_INDEX,
+                from_=tr_offset,
+                size=tr_limit,
+                body=body,
+            )
+            hits_tr = res_tr.get("hits", {}).get("hits", [])
+            for h in hits_tr:
+                src = h.get("_source", {})
+                vid = src.get("video_id")
+                if not vid:
+                    continue
+                start = float(src.get("start_seconds") or 0.0)
+                if vid not in first_by_video or start < first_by_video[vid][0]:
+                    first_by_video[vid] = (start, h)
+
+            video_ids = list(first_by_video.keys())
+            if video_ids:
+                rows = db.query(Video).filter(Video.id.in_(video_ids)).all()
+                info: Dict[str, Dict] = {}
+                for v in rows:
+                    thumb_url = build_public_url(build_thumbnail_key(str(v.id)))
+                    info[str(v.id)] = {
+                        "title": (v.title or "").strip() or v.original_filename,
+                        "thumbnail_url": thumb_url,
+                    }
+                for vid, (start, h) in first_by_video.items():
+                    src = h.get("_source", {})
+                    highlight = h.get("highlight") or {}
+                    snippet = highlight.get("text", [src.get("text") or ""])
+                    tr_items.append(
+                        {
+                            "video_id": vid,
+                            "title": info.get(vid, {}).get("title", ""),
+                            "thumbnail_url": info.get(vid, {}).get("thumbnail_url"),
+                            "progress_seconds": start,
+                            "snippet_html": snippet[0] if snippet else src.get("text") or "",
+                        }
+                    )
+            total_tr = res_tr.get("hits", {}).get("total", {})
+            tr_est_total = int(total_tr.get("value", 0))
+            tr_next_offset = (tr_offset + tr_limit) if (tr_est_total > tr_offset + tr_limit) else None
+        except Exception as e:
+            log.error(f"Transcript search failed: {e}")
 
     return {
-        "meili_ok": True,
+        "search_ok": True,
         "meta": {"items": meta_items, "estimated_total": meta_est_total, "next_offset": meta_next_offset},
         "transcript": {"items": tr_items, "estimated_total": tr_est_total, "next_offset": tr_next_offset},
     }

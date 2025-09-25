@@ -48,22 +48,32 @@ services:
       retries: 20
     restart: unless-stopped
   
-  meilisearch:
-    image: getmeili/meilisearch:v1.16
-    container_name: streemm_meili
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    container_name: streemm_opensearch
     environment:
-      MEILI_ENV: development
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_meili_key}
-      MEILI_LOG_LEVEL: info
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_PASSWORD:-Vinay@Open5e@rch}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
     ports:
-      - "7700:7700"
+      - "9600:9600"   # diagnostics port
+      - "9201:9200"   # REST API (host:container)
     volumes:
-      - meili_data:/meili_data
+      - opensearch_data:/usr/share/opensearch/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:7700/health | grep -q 'available'"]
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'status'"]
       interval: 5s
-      timeout: 3s
-      retries: 20
+      timeout: 5s
+      retries: 30
     restart: unless-stopped
 
   mailpit:
@@ -103,9 +113,10 @@ services:
       S3_REGION: us-east-1
       S3_BUCKET: media
       S3_USE_SSL: "false"
-      # Meilisearch
-      MEILI_URL: http://meilisearch:7700
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_meili_key}
+      # OpenSearch
+      OPENSEARCH_URL: http://opensearch:9200
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-opensearchadmin}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-Vinay@Open5e@rch}
     depends_on:
       db:
         condition: service_healthy
@@ -113,6 +124,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      opensearch:
+        condition: service_healthy
     restart: unless-stopped
 
   worker:
@@ -148,9 +161,10 @@ services:
       FFPROBE_TIMEOUT_SECONDS: 30
       WORKER_LOCK_TTL_MS: 900000
       WORKER_BACKOFF_SECONDS: 30,120,300
-      # Meilisearch
-      MEILI_URL: http://meilisearch:7700
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_meili_key}
+      # OpenSearch
+      OPENSEARCH_URL: http://opensearch:9200
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-opensearchadmin}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-Vinay@Open5e@rch}
     depends_on:
       api:
         condition: service_started
@@ -160,6 +174,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      opensearch:
+        condition: service_healthy
     restart: unless-stopped
 
   notifier:
@@ -223,4 +239,4 @@ volumes:
   web_next:
   minio_data:
   minio_config:
-  meili_data:
+  opensearch_data:

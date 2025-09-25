@@ -2,190 +2,273 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Iterable, List, Optional
 from datetime import datetime, timezone
+from typing import Any, Dict, Iterable, List, Optional
+from urllib.parse import urlparse
 
-import meilisearch
-from meilisearch.errors import MeilisearchApiError, MeilisearchError
+from opensearchpy import OpenSearch
+from opensearchpy.exceptions import NotFoundError
+from opensearchpy.helpers import bulk
 
 from config import settings
-from storage import build_thumbnail_key, build_public_url
+from storage import build_public_url, build_thumbnail_key
 
 log = logging.getLogger("search")
+if not log.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    log.addHandler(handler)
+log.setLevel(logging.INFO)
 
-_meili: Optional[meilisearch.Client] = None
+_client: Optional[OpenSearch] = None
+_indexes_ready = False
 
-def get_meili() -> Optional[meilisearch.Client]:
-    global _meili
-    if _meili is not None:
-        return _meili
-    if not settings.meili_url:
-        log.warning("No MEILI_URL configured")
+VIDEOS_INDEX = "videos"
+TRANSCRIPTS_INDEX = "transcript_chunks"
+
+
+def _build_client() -> Optional[OpenSearch]:
+    url = settings.opensearch_url
+    if not url:
+        log.warning("No OPENSEARCH_URL configured")
         return None
+
+    parsed = urlparse(url)
+    scheme = parsed.scheme or "http"
+    host = parsed.hostname or "localhost"
+    port = parsed.port or (443 if scheme == "https" else 9200)
+    use_ssl = scheme == "https"
+
+    http_auth = None
+    if settings.opensearch_username:
+        http_auth = (
+            settings.opensearch_username,
+            settings.opensearch_password or "",
+        )
+
     try:
-        _meili = meilisearch.Client(settings.meili_url, settings.meili_master_key or None)
-        # Test connection
-        _meili.health()
-        log.info(f"Meilisearch connected: {settings.meili_url}")
-        return _meili
-    except Exception as e:
-        log.error(f"Failed to connect to Meilisearch at {settings.meili_url}: {e}")
+        client = OpenSearch(
+            hosts=[{"host": host, "port": port, "scheme": scheme}],
+            http_auth=http_auth,
+            use_ssl=use_ssl,
+            verify_certs=use_ssl,
+            ssl_show_warn=False,
+            retry_on_timeout=True,
+            max_retries=3,
+        )
+        if not client.ping():
+            log.error("Failed to ping OpenSearch at %s", url)
+            return None
+        log.info("OpenSearch connected: %s", url)
+        return client
+    except Exception as exc:
+        log.error("Failed to connect to OpenSearch at %s: %s", url, exc)
         return None
+
+
+def get_client() -> Optional[OpenSearch]:
+    global _client
+    if _client is None:
+        _client = _build_client()
+    return _client
+
 
 def ensure_indexes() -> None:
-    c = get_meili()
-    if not c:
-        log.warning("Meilisearch not available, skipping index setup")
+    client = get_client()
+    if not client:
+        log.warning("OpenSearch not available, skipping index setup")
         return
-    
-    log.info("Setting up Meilisearch indexes...")
-    
-    # videos
-    try:
-        videos_index = c.index("videos")
-        info = videos_index.get_stats()
-        log.info(f"Videos index exists: {info.get('numberOfDocuments', 0)} docs")
-    except MeilisearchApiError as e:
-        log.info(f"Creating videos index: {e}")
-        try:
-            task = c.create_index("videos", {"primaryKey": "id"})
-            log.info(f"Created videos index, task: {task.task_uid}")
-        except Exception as e:
-            log.error(f"Failed to create videos index: {e}")
-            return
-    
-    # transcript_chunks
-    try:
-        chunks_index = c.index("transcript_chunks")
-        info = chunks_index.get_stats()
-        log.info(f"Transcript chunks index exists: {info.get('numberOfDocuments', 0)} docs")
-    except MeilisearchApiError as e:
-        log.info(f"Creating transcript_chunks index: {e}")
-        try:
-            task = c.create_index("transcript_chunks", {"primaryKey": "id"})
-            log.info(f"Created transcript_chunks index, task: {task.task_uid}")
-        except Exception as e:
-            log.error(f"Failed to create transcript_chunks index: {e}")
-            return
+    _ensure_indexes_once(client)
 
+
+def _ensure_indexes_once(client: OpenSearch) -> None:
+    global _indexes_ready
+    if _indexes_ready:
+        return
     try:
-        task = c.index("videos").update_settings({
-            "searchableAttributes": ["title", "description"],
-            "filterableAttributes": ["created_at", "user_id", "status"],
-            "sortableAttributes": ["created_at", "duration_seconds"],
-            "typoTolerance": { "enabled": True },
-        })
-        log.info(f"Updated videos index settings, task: {task.task_uid}")
-    except Exception as e:
-        log.error(f"Failed to update videos settings: {e}")
-    
+        _ensure_videos_index(client)
+        _ensure_transcripts_index(client)
+        _indexes_ready = True
+    except Exception as exc:
+        log.error("Failed to ensure OpenSearch indexes: %s", exc)
+
+
+def _ensure_videos_index(client: OpenSearch) -> None:
+    if client.indices.exists(index=VIDEOS_INDEX):
+        return
+    body = {
+        "settings": {
+            "number_of_shards": 1,
+            "number_of_replicas": 0,
+            "refresh_interval": "1s",
+        },
+        "mappings": {
+            "properties": {
+                "title": {"type": "text", "fields": {"raw": {"type": "keyword", "ignore_above": 256}}},
+                "description": {"type": "text"},
+                "user_id": {"type": "keyword"},
+                "created_at": {"type": "date"},
+                "duration_seconds": {"type": "float"},
+                "thumbnail_url": {"type": "keyword", "ignore_above": 512},
+                "status": {"type": "keyword"},
+            }
+        },
+    }
     try:
-        task = c.index("transcript_chunks").update_settings({
-            "searchableAttributes": ["text"],
-            "filterableAttributes": ["lang", "created_at", "video_id"], 
-            "sortableAttributes": ["created_at", "start_seconds"],
-            "typoTolerance": { "enabled": True },
-        })
-        log.info(f"Updated transcript_chunks index settings, task: {task.task_uid}")
-    except Exception as e:
-        log.error(f"Failed to update transcript_chunks settings: {e}")
+        client.indices.create(index=VIDEOS_INDEX, body=body)
+        log.info("Created OpenSearch index %s", VIDEOS_INDEX)
+    except Exception as exc:
+        if client.indices.exists(index=VIDEOS_INDEX):
+            return
+        raise exc
+
+
+def _ensure_transcripts_index(client: OpenSearch) -> None:
+    if client.indices.exists(index=TRANSCRIPTS_INDEX):
+        return
+    body = {
+        "settings": {
+            "number_of_shards": 1,
+            "number_of_replicas": 0,
+            "refresh_interval": "1s",
+        },
+        "mappings": {
+            "properties": {
+                "video_id": {"type": "keyword"},
+                "text": {"type": "text"},
+                "start_seconds": {"type": "float"},
+                "end_seconds": {"type": "float"},
+                "lang": {"type": "keyword"},
+                "created_at": {"type": "date"},
+            }
+        },
+    }
+    try:
+        client.indices.create(index=TRANSCRIPTS_INDEX, body=body)
+        log.info("Created OpenSearch index %s", TRANSCRIPTS_INDEX)
+    except Exception as exc:
+        if client.indices.exists(index=TRANSCRIPTS_INDEX):
+            return
+        raise exc
+
 
 def index_video_metadata(video) -> None:
-    """Upsert a single video's metadata document."""
-    c = get_meili()
-    if not c:
-        log.debug("Meilisearch not available, skipping video metadata indexing")
+    client = get_client()
+    if not client:
+        log.debug("OpenSearch not available, skipping video metadata indexing")
         return
-    
+
+    _ensure_indexes_once(client)
+
     video_id = str(video.id)
-    log.debug(f"Indexing video metadata for {video_id}")
-    
-    thumb_url = build_public_url(build_thumbnail_key(str(video.id)))
+    thumb_url = build_public_url(build_thumbnail_key(video_id))
     doc = {
-        "id": str(video.id),
         "title": (video.title or "").strip(),
         "description": (video.description or "").strip(),
         "user_id": str(video.user_id),
         "created_at": video.created_at.isoformat() if getattr(video, "created_at", None) else None,
-        "duration_seconds": float(video.duration_seconds) if video.duration_seconds is not None else 0,
+        "duration_seconds": float(video.duration_seconds) if getattr(video, "duration_seconds", None) is not None else 0.0,
         "thumbnail_url": thumb_url,
         "status": (video.status or "uploaded"),
     }
-    
+
     try:
-        task = c.index("videos").add_documents([doc])
-        log.info(f"Indexed video metadata for {video_id}, task: {task.task_uid}")
-    except Exception as e:
-        log.error(f"Failed to index video metadata for {video_id}: {e}")
+        client.index(index=VIDEOS_INDEX, id=video_id, body=doc, refresh="wait_for")
+        log.info("Indexed video metadata for %s", video_id)
+    except Exception as exc:
+        log.error("Failed to index video metadata for %s: %s", video_id, exc)
+
 
 def index_transcript_chunks(video_id: str, chunks: Iterable[Dict[str, Any]]) -> None:
-    """Replace transcript chunks for a video (idempotent)."""
-    c = get_meili()
-    if not c:
-        log.debug("Meilisearch not available, skipping transcript chunk indexing")
+    client = get_client()
+    if not client:
+        log.debug("OpenSearch not available, skipping transcript chunk indexing")
         return
-    
-    log.info(f"Indexing transcript chunks for video {video_id}")
-    
-    idx = c.index("transcript_chunks")
-    
-    # Idempotent replace: delete any existing docs for this video first
+
+    _ensure_indexes_once(client)
+
+    chunk_list: List[Dict[str, Any]] = list(chunks)
+    log.info("Indexing %d transcript chunks for video %s", len(chunk_list), video_id)
+
     try:
-        del_task = idx.delete_documents(filter=f'video_id = "{video_id}"')
-        log.info(f"Enqueued deletion of existing transcript chunks for {video_id}, task: {del_task.task_uid}")
-    except Exception as e:
-        log.warning(f"Failed to enqueue deletion for {video_id}: {e}")
-    
-    # Add new docs
-    docs: List[Dict[str, Any]] = []
-    for ch in chunks:
-        start_sec = float(ch["start_seconds"])
-        end_sec = float(ch["end_seconds"])
-        start_int = int(round(start_sec))
-        created_at = ch.get("created_at")
-        if not created_at:
-            created_at = datetime.now(timezone.utc).isoformat()
-        docs.append({
-            "id": f"{video_id}_{start_int}",
-            "video_id": video_id,
-            "text": ch["text"],
-            "start_seconds": start_sec,
-            "end_seconds": end_sec,
-            "lang": ch.get("lang", "en"),
-            "created_at": created_at,
-        })
-    
-    log.info(f"Prepared {len(docs)} transcript chunks for {video_id}")
-    
-    if docs:
-        try:
-            task = idx.add_documents(docs)
-            log.info(f"Indexed {len(docs)} transcript chunks for {video_id}, task: {task.task_uid}")
-        except Exception as e:
-            log.error(f"Failed to index transcript chunks for {video_id}: {e}")
+        client.delete_by_query(
+            index=TRANSCRIPTS_INDEX,
+            body={"query": {"term": {"video_id": video_id}}},
+            refresh=True,
+            conflicts="proceed",
+        )
+    except NotFoundError:
+        pass
+    except Exception as exc:
+        log.warning("Failed to purge transcript chunks for %s: %s", video_id, exc)
+
+    if not chunk_list:
+        return
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    actions = []
+    for idx, chunk in enumerate(chunk_list):
+        text = (chunk.get("text") or "").strip()
+        if not text:
+            continue
+        start_sec = float(chunk.get("start_seconds", 0.0))
+        end_sec = float(chunk.get("end_seconds", start_sec))
+        created_at = chunk.get("created_at") or now_iso
+        lang = chunk.get("lang") or settings.whisper_lang
+        doc_id = f"{video_id}_{idx}_{int(round(start_sec * 1000))}"
+
+        actions.append(
+            {
+                "_op_type": "index",
+                "_index": TRANSCRIPTS_INDEX,
+                "_id": doc_id,
+                "_source": {
+                    "video_id": video_id,
+                    "text": text,
+                    "start_seconds": start_sec,
+                    "end_seconds": end_sec,
+                    "lang": lang,
+                    "created_at": created_at,
+                },
+            }
+        )
+
+    if not actions:
+        log.warning("No non-empty transcript chunks to index for %s", video_id)
+        return
+
+    success, errors = bulk(client, actions, refresh="wait_for")
+    if errors:
+        log.error("Bulk indexing errors for %s: %s", video_id, errors)
     else:
-        log.warning(f"No transcript chunks to index for {video_id}")
+        log.info("Indexed %d transcript chunks for %s", success, video_id)
+
 
 def delete_video_from_search(video_id: str) -> None:
-    c = get_meili()
-    if not c:
-        log.debug("Meilisearch not available, skipping video deletion from search")
+    client = get_client()
+    if not client:
+        log.debug("OpenSearch not available, skipping video deletion from search")
         return
-    
-    log.info(f"Deleting video {video_id} from search indexes")
-    
+
     try:
-        task = c.index("videos").delete_document(video_id)
-        log.info(f"Deleted video {video_id} from videos index, task: {task.task_uid}")
-    except MeilisearchApiError as e:
-        log.warning(f"Failed to delete video {video_id} from videos index: {e}")
-    except Exception as e:
-        log.error(f"Unexpected error deleting video {video_id} from videos index: {e}")
-    
+        resp = client.delete(index=VIDEOS_INDEX, id=video_id, refresh="wait_for")
+        result = resp.get("result", "unknown") if isinstance(resp, dict) else resp
+        log.info("Deleted video %s from %s index (result=%s)", video_id, VIDEOS_INDEX, result)
+    except NotFoundError:
+        log.debug("Video %s already absent from %s index", video_id, VIDEOS_INDEX)
+    except Exception as exc:
+        log.error("Failed to delete video %s from %s index: %s", video_id, VIDEOS_INDEX, exc)
+
     try:
-        task = c.index("transcript_chunks").delete_documents(filter=f'video_id = "{video_id}"')
-        log.info(f"Deleted transcript chunks for {video_id}, task: {task.task_uid}")
-    except MeilisearchApiError as e:
-        log.warning(f"Failed to delete transcript chunks for {video_id}: {e}")
-    except Exception as e:
-        log.error(f"Unexpected error deleting transcript chunks for {video_id}: {e}")
+        resp = client.delete_by_query(
+            index=TRANSCRIPTS_INDEX,
+            body={"query": {"term": {"video_id": video_id}}},
+            refresh=True,
+            conflicts="proceed",
+        )
+        deleted = resp.get("deleted", 0) if isinstance(resp, dict) else resp
+        log.info("Deleted transcript chunks for %s (deleted=%s)", video_id, deleted)
+    except NotFoundError:
+        log.debug("Transcript index missing for video %s", video_id)
+    except Exception as exc:
+        log.error("Failed to delete transcript chunks for %s: %s", video_id, exc)

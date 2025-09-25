@@ -43,9 +43,10 @@ class Settings:
         backoff_csv = os.getenv("WORKER_BACKOFF_SECONDS", "30,120,300")
         self.worker_backoff_seconds = [int(x.strip()) for x in backoff_csv.split(",") if x.strip()]
 
-        # Meilisearch
-        self.meili_url = os.getenv("MEILI_URL", "http://localhost:7700")
-        self.meili_master_key = os.getenv("MEILI_MASTER_KEY", "")
+        # OpenSearch
+        self.opensearch_url = os.getenv("OPENSEARCH_URL", "http://localhost:9200")
+        self.opensearch_username = os.getenv("OPENSEARCH_USERNAME", "admin")
+        self.opensearch_password = os.getenv("OPENSEARCH_PASSWORD", "admin")
 
         # Search thresholds
         self.min_meta_coverage = float(os.getenv("MIN_META_COVERAGE", "0.0"))
