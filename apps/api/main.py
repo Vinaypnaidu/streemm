@@ -1,10 +1,13 @@
 # apps/api/main.py
-from fastapi import FastAPI, Depends
+from __future__ import annotations
+
+import logging
+from typing import Callable, Iterable
+
+from fastapi import FastAPI, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
-from db import healthcheck as db_health
-from cache import healthcheck as cache_health
 from models import User
 from session import get_current_user
 from routes_auth import router as auth_router
@@ -15,9 +18,33 @@ from routes_history import router as history_router
 from routes_search import router as search_router
 from routes_homefeed import router as homefeed_router
 from search import ensure_indexes, get_client, VIDEOS_INDEX, TRANSCRIPTS_INDEX
+from health import collect_health_status
 
 
 app = FastAPI(title="Streemm API")
+
+log = logging.getLogger("api.main")
+
+
+StartupTask = tuple[str, Callable[[], None], bool]
+
+STARTUP_TASKS: tuple[StartupTask, ...] = (
+    ("object_storage", ensure_bucket, False),
+    ("search_indexes", ensure_indexes, True),
+)
+
+
+def _run_startup_tasks(tasks: Iterable[StartupTask]) -> None:
+    for name, task, optional in tasks:
+        try:
+            task()
+            log.debug("Startup task '%s' completed", name)
+        except Exception as exc:
+            if optional:
+                log.info("Optional startup task '%s' failed: %s", name, exc)
+            else:
+                log.warning("Startup task '%s' failed: %s", name, exc)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,15 +63,8 @@ app.include_router(homefeed_router)
 
 
 @app.on_event("startup")
-def _startup():
-    try:
-        ensure_bucket()
-    except Exception:
-        pass
-    try:
-        ensure_indexes()
-    except Exception:
-        pass
+def _startup() -> None:
+    _run_startup_tasks(STARTUP_TASKS)
 
 
 @app.get("/")
@@ -53,18 +73,8 @@ def root():
 
 
 @app.get("/healthz")
-def healthz():
-    ok_db = True
-    ok_cache = True
-    try:
-        db_health()
-    except Exception:
-        ok_db = False
-    try:
-        cache_health()
-    except Exception:
-        ok_cache = False
-    return {"ok": ok_db and ok_cache, "db": ok_db, "cache": ok_cache}
+def healthz(include_optional: bool = Query(True, description="Include optional checks")):
+    return collect_health_status(include_optional=include_optional)
 
 
 @app.get("/search/debug")
