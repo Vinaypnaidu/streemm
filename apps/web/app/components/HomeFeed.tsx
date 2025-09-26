@@ -58,24 +58,26 @@ export default function HomeFeed() {
             const name = (v.title && v.title.trim()) || 'Untitled';
             return (
               <div key={v.id} className="relative rounded-lg overflow-hidden bg-neutral-900">
-                <Link href={`/videos/${v.id}`} className="block">
-                  {v.thumbnail_url ? (
-                    <img
-                      src={v.thumbnail_url}
-                      alt=""
-                      className="w-full aspect-video object-cover"
-                    />
-                  ) : (
-                    <div className="w-full aspect-video grid place-items-center text-neutral-400 bg-neutral-800">
-                      No thumbnail
-                    </div>
-                  )}
-                </Link>
+                <div className="p-4 pb-0">
+                  <Link href={`/videos/${v.id}`} className="block">
+                    {v.thumbnail_url ? (
+                      <img
+                        src={v.thumbnail_url}
+                        alt=""
+                        className="w-full aspect-video object-cover rounded-md"
+                      />
+                    ) : (
+                      <div className="w-full aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">
+                        No thumbnail
+                      </div>
+                    )}
+                  </Link>
+                </div>
                 <div className="p-4">
                   <div className="mb-3">
                     <ProgressBar percent={v.progress_percent ?? 0} />
                   </div>
-                  <Link href={`/videos/${v.id}`} className="font-medium text-sm truncate mr-3 hover:underline" title={name}>
+                  <Link href={`/videos/${v.id}`} className="block font-medium text-sm truncate pr-2 hover:underline" title={name}>
                     {name}
                   </Link>
                 </div>

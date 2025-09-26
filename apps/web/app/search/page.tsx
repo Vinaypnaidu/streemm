@@ -113,14 +113,14 @@ export default function SearchPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Left: metadata results */}
         <section>
-          <h2 className="text-xl font-semibold mb-3">Metadata</h2>
+          <h2 className="text-xl font-semibold mb-3">Videos</h2>
           {meta.length === 0 ? (
             <div className="text-sm text-neutral-500">No metadata matches.</div>
           ) : (
             <div className="space-y-4">
               {meta.map((it) => (
                 <div key={it.video_id} className="w-full rounded-lg border border-neutral-800 bg-neutral-900">
-                  <div className="flex gap-4 p-4">
+                  <div className="flex gap-4 p-4 pr-6">
                     <Link href={`/videos/${it.video_id}`} className="shrink-0">
                       {it.thumbnail_url ? (
                         <img src={it.thumbnail_url} alt="" className="w-64 aspect-video object-cover rounded-md" />
@@ -128,19 +128,12 @@ export default function SearchPage() {
                         <div className="w-64 aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">No thumbnail</div>
                       )}
                     </Link>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 pr-4">
                       <Link
                         href={`/videos/${it.video_id}`}
-                        className="font-medium text-sm mr-3 hover:underline line-clamp-2"
+                        className="block font-medium text-sm hover:underline line-clamp-2"
                         dangerouslySetInnerHTML={{ __html: it.title_html || '' }}
                       />
-                      <div
-                        className="text-xs text-neutral-400 mt-1 line-clamp-3"
-                        dangerouslySetInnerHTML={{ __html: it.description_html || '' }}
-                      />
-                      <div className="text-xs text-neutral-500 mt-2">
-                        {it.created_at ? new Date(it.created_at).toLocaleString() : null}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -151,7 +144,7 @@ export default function SearchPage() {
 
         {/* Right: transcript results */}
         <section>
-          <h2 className="text-xl font-semibold mb-3">Transcript</h2>
+          <h2 className="text-xl font-semibold mb-3">Jump To Moments</h2>
           {tx.length === 0 ? (
             <div className="text-sm text-neutral-500">No transcript matches.</div>
           ) : (
