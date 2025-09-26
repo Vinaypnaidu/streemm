@@ -1,11 +1,12 @@
 // apps/web/app/upload/page.tsx
-'use client';
+"use client";
 
-import React, { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '../providers/AuthProvider';
+import React, { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../providers/AuthProvider";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 type PresignResponse = {
   video_id: string;
@@ -15,56 +16,55 @@ type PresignResponse = {
 };
 
 export default function UploadPage() {
-    const router = useRouter();
-    const { me, loading, getCsrf } = useAuth();
-  const [title, setTitle] = useState<string>('');
-  const [description, setDescription] = useState<string>('');
-    const [file, setFile] = useState<File | null>(null);
-    const [progress, setProgress] = useState<number>(0);
-    const [status, setStatus] = useState<string>('');
-    const [result, setResult] = useState<PresignResponse | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const router = useRouter();
+  const { me, loading, getCsrf } = useAuth();
+  const [title, setTitle] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [progress, setProgress] = useState<number>(0);
+  const [status, setStatus] = useState<string>("");
+  const [result, setResult] = useState<PresignResponse | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading && !me) {
-        router.replace('/');
+      router.replace("/");
     }
-    }, [loading, me, router]);
-    
+  }, [loading, me, router]);
+
   // CSRF provided centrally via getCsrf()
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null;
     setFile(f);
     setProgress(0);
-    setStatus('');
+    setStatus("");
     setResult(null);
   };
 
   const onUpload = async () => {
     if (!file) {
-      setStatus('Select a file first.');
+      setStatus("Select a file first.");
       return;
     }
     if (!title.trim() || !description.trim()) {
-      setStatus('Please enter a title and description.');
+      setStatus("Please enter a title and description.");
       return;
     }
-    if (file.type !== 'video/mp4') {
-      setStatus('Only video/mp4 is allowed.');
+    if (file.type !== "video/mp4") {
+      setStatus("Only video/mp4 is allowed.");
       return;
     }
 
-    setStatus('Requesting presigned URL...');
+    setStatus("Requesting presigned URL...");
     try {
       const csrf = await getCsrf();
       const presignRes = await fetch(`${API_BASE}/uploads/presign`, {
-        method: 'POST',
-        credentials: 'include',
+        method: "POST",
+        credentials: "include",
         headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': csrf,
+          "Content-Type": "application/json",
+          "x-csrf-token": csrf,
         },
         body: JSON.stringify({
           filename: file.name,
@@ -79,20 +79,20 @@ export default function UploadPage() {
       const presign: PresignResponse = await presignRes.json();
       setResult(presign);
 
-      setStatus('Uploading to object storage...');
+      setStatus("Uploading to object storage...");
       await uploadWithProgress(presign.put_url, file, presign.headers);
       setProgress(100);
 
       // Auto-finalize after successful upload
-      setStatus('Finalizing upload...');
+      setStatus("Finalizing upload...");
       const originalName = file.name;
       const csrf2 = await getCsrf();
       const finRes = await fetch(`${API_BASE}/videos`, {
-        method: 'POST',
-        credentials: 'include',
+        method: "POST",
+        credentials: "include",
         headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': csrf2,
+          "Content-Type": "application/json",
+          "x-csrf-token": csrf2,
         },
         body: JSON.stringify({
           video_id: presign.video_id,
@@ -107,21 +107,27 @@ export default function UploadPage() {
         throw new Error(err.detail || `Finalize failed (${finRes.status})`);
       }
       const detail: any = await finRes.json();
-      setStatus(`Finalized. Status: ${detail.status || 'processing'}. video_id=${presign.video_id}`);
-      router.push('/videos');
+      setStatus(
+        `Finalized. Status: ${detail.status || "processing"}. video_id=${presign.video_id}`,
+      );
+      router.push("/videos");
 
       // Clear selection (kept for completeness; will navigate away)
       setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (e: any) {
       setStatus(`Error: ${e.message || String(e)}`);
     }
   };
 
-  const uploadWithProgress = (url: string, blob: Blob, headers: Record<string, string>) => {
+  const uploadWithProgress = (
+    url: string,
+    blob: Blob,
+    headers: Record<string, string>,
+  ) => {
     return new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('PUT', url, true);
+      xhr.open("PUT", url, true);
       // Do not send credentials to MinIO presigned URL
       Object.entries(headers || {}).forEach(([k, v]) => {
         xhr.setRequestHeader(k, v);
@@ -140,7 +146,7 @@ export default function UploadPage() {
           reject(new Error(`PUT failed (${xhr.status})`));
         }
       };
-      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.onerror = () => reject(new Error("Network error during upload"));
       xhr.send(blob);
     });
   };
@@ -153,13 +159,19 @@ export default function UploadPage() {
       <div className="w-full max-w-xl mx-auto">
         <div className="border border-neutral-800 rounded-2xl p-6 shadow-sm bg-neutral-900 text-neutral-100">
           <header className="text-center mb-6">
-            <h1 className="text-2xl font-semibold tracking-tight">Upload a video</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Upload a video
+            </h1>
             <p className="mt-2 text-sm text-neutral-400">
               MP4 only for now. Keep the tab open during upload.
             </p>
           </header>
 
-          {status && <p className="mb-3 text-sm text-center text-neutral-200">{status}</p>}
+          {status && (
+            <p className="mb-3 text-sm text-center text-neutral-200">
+              {status}
+            </p>
+          )}
 
           <div className="grid gap-5">
             <div className="grid gap-3">
@@ -174,7 +186,9 @@ export default function UploadPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label className="block text-sm font-medium mb-1">
+                  Description
+                </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -185,7 +199,9 @@ export default function UploadPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Select file</label>
+              <label className="block text-sm font-medium mb-1">
+                Select file
+              </label>
 
               {/* Hidden input + styled trigger */}
               <input
@@ -210,28 +226,43 @@ export default function UploadPage() {
                   disabled={!file}
                   className="w-full rounded-full bg-neutral-100 text-neutral-900 px-5 py-3 font-medium hover:opacity-90 disabled:opacity-50 transition"
                 >
-                  {progress > 0 && progress < 100 ? 'Uploading…' : 'Upload'}
+                  {progress > 0 && progress < 100 ? "Uploading…" : "Upload"}
                 </button>
               </div>
 
               <p className="mt-2 text-xs text-neutral-400 h-5 truncate text-center sm:text-left">
-                {file ? `${file.name} (${Math.round(file.size / 1024 / 1024)} MB)` : ' '}
+                {file
+                  ? `${file.name} (${Math.round(file.size / 1024 / 1024)} MB)`
+                  : " "}
               </p>
             </div>
 
             {progress > 0 && (
               <div>
                 <div className="h-2 bg-neutral-800 rounded">
-                  <div className="h-2 bg-neutral-100 rounded" style={{ width: `${progress}%` }} />
+                  <div
+                    className="h-2 bg-neutral-100 rounded"
+                    style={{ width: `${progress}%` }}
+                  />
                 </div>
-                <div className="text-sm text-neutral-300 mt-1 text-center">{progress}%</div>
+                <div className="text-sm text-neutral-300 mt-1 text-center">
+                  {progress}%
+                </div>
               </div>
             )}
 
             {result && (
               <div className="text-sm text-neutral-300">
-                <div><span className="font-medium text-neutral-100">video_id:</span> {result.video_id}</div>
-                <div><span className="font-medium text-neutral-100">raw_key:</span> {result.raw_key}</div>
+                <div>
+                  <span className="font-medium text-neutral-100">
+                    video_id:
+                  </span>{" "}
+                  {result.video_id}
+                </div>
+                <div>
+                  <span className="font-medium text-neutral-100">raw_key:</span>{" "}
+                  {result.raw_key}
+                </div>
               </div>
             )}
           </div>

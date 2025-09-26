@@ -1,3 +1,4 @@
+# apps/api/main.py
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,6 +34,7 @@ app.include_router(history_router)
 app.include_router(search_router)
 app.include_router(homefeed_router)
 
+
 @app.on_event("startup")
 def _startup():
     try:
@@ -44,9 +46,11 @@ def _startup():
     except Exception:
         pass
 
+
 @app.get("/")
 def root():
     return {"message": "hello from api"}
+
 
 @app.get("/healthz")
 def healthz():
@@ -62,6 +66,7 @@ def healthz():
         ok_cache = False
     return {"ok": ok_db and ok_cache, "db": ok_db, "cache": ok_cache}
 
+
 @app.get("/search/debug")
 def search_debug():
     client = get_client()
@@ -71,8 +76,16 @@ def search_debug():
         cluster = client.cluster.health()
         indices = client.cat.indices(format="json")
         stats = {
-            "videos": client.indices.get(VIDEOS_INDEX).get(VIDEOS_INDEX) if client.indices.exists(VIDEOS_INDEX) else None,
-            "transcript_chunks": client.indices.get(TRANSCRIPTS_INDEX).get(TRANSCRIPTS_INDEX) if client.indices.exists(TRANSCRIPTS_INDEX) else None,
+            "videos": (
+                client.indices.get(VIDEOS_INDEX).get(VIDEOS_INDEX)
+                if client.indices.exists(VIDEOS_INDEX)
+                else None
+            ),
+            "transcript_chunks": (
+                client.indices.get(TRANSCRIPTS_INDEX).get(TRANSCRIPTS_INDEX)
+                if client.indices.exists(TRANSCRIPTS_INDEX)
+                else None
+            ),
         }
         return {
             "ok": True,
@@ -83,12 +96,15 @@ def search_debug():
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
 
+
 @app.get("/hello")
 def hello(name: str = "world"):
     return {"message": f"hello {name}"}
 
+
 @app.get("/me")
 def me(user: User = Depends(get_current_user)):
     return {"id": str(user.id), "email": user.email}
+
 
 # Run: uvicorn main:app --reload --port 8000

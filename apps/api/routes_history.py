@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 router = APIRouter(prefix="/history", tags=["history"])
 
+
 @router.post("/heartbeat", response_model=Ok, status_code=status.HTTP_200_OK)
 def heartbeat(
     request: Request,
@@ -67,6 +68,7 @@ def heartbeat(
 
     return Ok(ok=True)
 
+
 @router.get("", response_model=PaginatedHistory)
 def list_history(
     user: User = Depends(get_current_user),
@@ -94,10 +96,14 @@ def list_history(
         thumb_url = build_public_url(thumb_key) if has_thumb else None
 
         # Duration and progress
-        dur: Optional[float] = v.duration_seconds if v.duration_seconds is not None else None
+        dur: Optional[float] = (
+            v.duration_seconds if v.duration_seconds is not None else None
+        )
         progress = None
         if dur and dur > 0:
-            progress = max(0.0, min(100.0, (float(wh.last_position_seconds) / dur) * 100.0))
+            progress = max(
+                0.0, min(100.0, (float(wh.last_position_seconds) / dur) * 100.0)
+            )
 
         items.append(
             HistoryItem(

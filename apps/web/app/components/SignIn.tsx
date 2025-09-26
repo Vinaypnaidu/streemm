@@ -1,17 +1,19 @@
-'use client';
+// apps/web/app/components/SignIn.tsx
+"use client";
 
-import { useState } from 'react';
-import { useAuth } from '../providers/AuthProvider';
+import { useState } from "react";
+import { useAuth } from "../providers/AuthProvider";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
-type Mode = 'login' | 'register';
+type Mode = "login" | "register";
 
 export default function SignIn() {
   const { setMe, getCsrf } = useAuth();
-  const [mode, setMode] = useState<Mode>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<Mode>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -21,22 +23,22 @@ export default function SignIn() {
     setSubmitting(true);
     try {
       const csrf = await getCsrf();
-      const url = mode === 'login' ? '/auth/login' : '/auth/register';
+      const url = mode === "login" ? "/auth/login" : "/auth/register";
       const res = await fetch(`${API_BASE}${url}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json', 'x-csrf-token': csrf },
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json", "x-csrf-token": csrf },
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || 'Request failed');
+        throw new Error(data.detail || "Request failed");
       }
       const user = await res.json();
       setMe(user);
-      setPassword('');
+      setPassword("");
     } catch (e: any) {
-      setErr(e.message || 'Request failed');
+      setErr(e.message || "Request failed");
     } finally {
       setSubmitting(false);
     }
@@ -59,19 +61,21 @@ export default function SignIn() {
             <input
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="you@example.com"
               className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">{mode === 'login' ? 'Password' : 'Create a password'}</label>
+            <label className="block text-sm font-medium mb-1">
+              {mode === "login" ? "Password" : "Create a password"}
+            </label>
             <input
               type="password"
-              minLength={mode === 'login' ? undefined : 8}
+              minLength={mode === "login" ? undefined : 8}
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="••••••••"
               className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
@@ -82,13 +86,37 @@ export default function SignIn() {
             disabled={submitting}
             className="w-full rounded-full bg-neutral-100 text-neutral-900 px-5 py-[10px] mt-2 font-medium hover:opacity-90 disabled:opacity-50 transition"
           >
-            {submitting ? (mode === 'login' ? 'Signing in…' : 'Creating…') : (mode === 'login' ? 'Sign in' : 'Create account')}
+            {submitting
+              ? mode === "login"
+                ? "Signing in…"
+                : "Creating…"
+              : mode === "login"
+                ? "Sign in"
+                : "Create account"}
           </button>
           <p className="text-center text-sm text-neutral-400">
-            {mode === 'login' ? (
-              <>No account? <button type="button" onClick={() => setMode('register')} className="text-neutral-100 underline underline-offset-4">Create one</button></>
+            {mode === "login" ? (
+              <>
+                No account?{" "}
+                <button
+                  type="button"
+                  onClick={() => setMode("register")}
+                  className="text-neutral-100 underline underline-offset-4"
+                >
+                  Create one
+                </button>
+              </>
             ) : (
-              <>Already have an account? <button type="button" onClick={() => setMode('login')} className="text-neutral-100 underline underline-offset-4">Log in</button></>
+              <>
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => setMode("login")}
+                  className="text-neutral-100 underline underline-offset-4"
+                >
+                  Log in
+                </button>
+              </>
             )}
           </p>
         </form>
@@ -96,5 +124,3 @@ export default function SignIn() {
     </div>
   );
 }
-
-

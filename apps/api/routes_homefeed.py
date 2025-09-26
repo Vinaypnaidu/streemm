@@ -1,3 +1,4 @@
+# apps/api/routes_homefeed.py
 import logging
 import re
 from collections import Counter
@@ -20,9 +21,47 @@ log = logging.getLogger("routes_homefeed")
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 STOPWORDS: Set[str] = {
-    "a","an","the","to","is","in","on","of","for","and","or","as","at","be","by","with","from",
-    "this","that","it","you","your","are","was","were","will","can","not","we","our","they","them",
-    "their","i","me","my","mine","video","videos","watch","watched",
+    "a",
+    "an",
+    "the",
+    "to",
+    "is",
+    "in",
+    "on",
+    "of",
+    "for",
+    "and",
+    "or",
+    "as",
+    "at",
+    "be",
+    "by",
+    "with",
+    "from",
+    "this",
+    "that",
+    "it",
+    "you",
+    "your",
+    "are",
+    "was",
+    "were",
+    "will",
+    "can",
+    "not",
+    "we",
+    "our",
+    "they",
+    "them",
+    "their",
+    "i",
+    "me",
+    "my",
+    "mine",
+    "video",
+    "videos",
+    "watch",
+    "watched",
 }
 
 
@@ -41,7 +80,9 @@ def _tokens_from_text(text: str) -> List[str]:
     return out
 
 
-def _compute_progress_map(db: Session, user: User, video_ids: List[str]) -> Dict[str, Optional[float]]:
+def _compute_progress_map(
+    db: Session, user: User, video_ids: List[str]
+) -> Dict[str, Optional[float]]:
     if not video_ids:
         return {}
     rows = (
@@ -67,7 +108,9 @@ def _compute_progress_map(db: Session, user: User, video_ids: List[str]) -> Dict
     return progress
 
 
-def _make_items_from_videos(vids: List[Video], progress: Dict[str, Optional[float]], source: str) -> HomeFeedResponse:
+def _make_items_from_videos(
+    vids: List[Video], progress: Dict[str, Optional[float]], source: str
+) -> HomeFeedResponse:
     items: List[HomeFeedItem] = []
     for v in vids:
         thumb_url = build_public_url(build_thumbnail_key(str(v.id)))
@@ -77,7 +120,11 @@ def _make_items_from_videos(vids: List[Video], progress: Dict[str, Optional[floa
                 title=(v.title or "").strip() or v.original_filename,
                 description=(v.description or "").strip(),
                 thumbnail_url=thumb_url,
-                duration_seconds=float(v.duration_seconds) if v.duration_seconds is not None else None,
+                duration_seconds=(
+                    float(v.duration_seconds)
+                    if v.duration_seconds is not None
+                    else None
+                ),
                 progress_percent=progress.get(str(v.id)),
             )
         )

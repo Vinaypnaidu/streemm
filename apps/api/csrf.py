@@ -1,3 +1,4 @@
+# apps/api/csrf.py
 import secrets
 from typing import Tuple
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -12,18 +13,20 @@ TTL_SECONDS = 86400  # 24h
 
 _serializer = URLSafeTimedSerializer(settings.session_secret, salt="csrf")
 
+
 def issue_csrf(response: Response) -> str:
     token = _serializer.dumps(secrets.token_urlsafe(32))
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
-        httponly=False,          # must be readable by JS for double-submit
+        httponly=False,  # must be readable by JS for double-submit
         samesite="lax",
         secure=(settings.env.lower() == "production"),
         path="/",
         max_age=TTL_SECONDS,
     )
     return token
+
 
 def require_csrf(request: Request) -> None:
     cookie = request.cookies.get(COOKIE_NAME)

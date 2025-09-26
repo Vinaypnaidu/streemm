@@ -1,7 +1,9 @@
+# apps/api/mailer.py
 import smtplib
 from email.message import EmailMessage
 from typing import Optional
 from config import settings
+
 
 def send_email(to: str, subject: str, text: str) -> None:
     if not settings.email_enabled:

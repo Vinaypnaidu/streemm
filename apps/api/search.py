@@ -104,7 +104,10 @@ def _ensure_videos_index(client: OpenSearch) -> None:
         },
         "mappings": {
             "properties": {
-                "title": {"type": "text", "fields": {"raw": {"type": "keyword", "ignore_above": 256}}},
+                "title": {
+                    "type": "text",
+                    "fields": {"raw": {"type": "keyword", "ignore_above": 256}},
+                },
                 "description": {"type": "text"},
                 "user_id": {"type": "keyword"},
                 "created_at": {"type": "date"},
@@ -166,8 +169,14 @@ def index_video_metadata(video) -> None:
         "title": (video.title or "").strip(),
         "description": (video.description or "").strip(),
         "user_id": str(video.user_id),
-        "created_at": video.created_at.isoformat() if getattr(video, "created_at", None) else None,
-        "duration_seconds": float(video.duration_seconds) if getattr(video, "duration_seconds", None) is not None else 0.0,
+        "created_at": (
+            video.created_at.isoformat() if getattr(video, "created_at", None) else None
+        ),
+        "duration_seconds": (
+            float(video.duration_seconds)
+            if getattr(video, "duration_seconds", None) is not None
+            else 0.0
+        ),
         "thumbnail_url": thumb_url,
         "status": (video.status or "uploaded"),
     }
@@ -253,11 +262,15 @@ def delete_video_from_search(video_id: str) -> None:
     try:
         resp = client.delete(index=VIDEOS_INDEX, id=video_id, refresh="wait_for")
         result = resp.get("result", "unknown") if isinstance(resp, dict) else resp
-        log.info("Deleted video %s from %s index (result=%s)", video_id, VIDEOS_INDEX, result)
+        log.info(
+            "Deleted video %s from %s index (result=%s)", video_id, VIDEOS_INDEX, result
+        )
     except NotFoundError:
         log.debug("Video %s already absent from %s index", video_id, VIDEOS_INDEX)
     except Exception as exc:
-        log.error("Failed to delete video %s from %s index: %s", video_id, VIDEOS_INDEX, exc)
+        log.error(
+            "Failed to delete video %s from %s index: %s", video_id, VIDEOS_INDEX, exc
+        )
 
     try:
         resp = client.delete_by_query(

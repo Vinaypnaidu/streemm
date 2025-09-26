@@ -1,4 +1,4 @@
-/// <reference types="next" />
+// apps/web/next-env.d.ts
 /// <reference types="next/image-types/global" />
 
 // NOTE: This file should not be edited

@@ -1,8 +1,9 @@
-'use client';
+// apps/web/app/components/AuthGate.tsx
+"use client";
 
-import React from 'react';
-import { useAuth } from '../providers/AuthProvider';
-import SignIn from './SignIn';
+import React from "react";
+import { useAuth } from "../providers/AuthProvider";
+import SignIn from "./SignIn";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const { me, loading } = useAuth();
@@ -10,5 +11,3 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (!me) return <SignIn />;
   return <>{children}</>;
 }
-
-

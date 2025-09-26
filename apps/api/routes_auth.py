@@ -1,3 +1,4 @@
+# apps/api/routes_auth.py
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from sqlalchemy.orm import Session
 
@@ -20,8 +21,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 LOGIN_LIMIT = 20
 LOGIN_WINDOW_SEC = 60
 
+
 def _login_key(ip: str, email: str) -> str:
     return f"rl:login:{ip}:{email}"
+
 
 def check_login_rate_limit(ip: str, email: str) -> None:
     k = _login_key(ip, email)
@@ -29,15 +32,24 @@ def check_login_rate_limit(ip: str, email: str) -> None:
     if count == 1:
         redis_client.expire(k, LOGIN_WINDOW_SEC)
     if count > LOGIN_LIMIT:
-        raise HTTPException(status_code=429, detail="Too many login attempts, try again soon.")
+        raise HTTPException(
+            status_code=429, detail="Too many login attempts, try again soon."
+        )
+
 
 @router.get("/csrf")
 def get_csrf(response: Response):
     token = issue_csrf(response)
     return {"csrf": token, "header": HEADER_NAME}
 
+
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(request: Request, body: RegisterRequest, response: Response, db: Session = Depends(get_db)):
+def register(
+    request: Request,
+    body: RegisterRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     # CSRF
     require_csrf(request)
 
@@ -45,7 +57,9 @@ def register(request: Request, body: RegisterRequest, response: Response, db: Se
     if not email:
         raise HTTPException(status_code=400, detail="Invalid email")
     if not body.password or len(body.password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        raise HTTPException(
+            status_code=400, detail="Password must be at least 8 characters"
+        )
 
     existing = db.query(User).filter(User.email == email).first()
     if existing:
@@ -61,8 +75,14 @@ def register(request: Request, body: RegisterRequest, response: Response, db: Se
 
     return UserOut(id=str(user.id), email=user.email)
 
+
 @router.post("/login", response_model=UserOut)
-def login(request: Request, body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+def login(
+    request: Request,
+    body: LoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     # CSRF
     require_csrf(request)
 
@@ -83,14 +103,16 @@ def login(request: Request, body: LoginRequest, response: Response, db: Session 
 
     return UserOut(id=str(user.id), email=user.email)
 
+
 @router.post("/logout", response_model=Ok, status_code=status.HTTP_200_OK)
 def logout(request: Request, response: Response):
     # CSRF
     require_csrf(request)
 
     from config import settings
+
     sid = request.cookies.get(settings.session_cookie_name)
     if sid:
-        delete_session(sid)         # server-side revoke
+        delete_session(sid)  # server-side revoke
     clear_session_cookie(response)  # client-side remove
     return Ok(ok=True)

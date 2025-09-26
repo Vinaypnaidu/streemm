@@ -1,7 +1,9 @@
+# apps/api/config.py
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
 
 class Settings:
     def __init__(self):
@@ -27,7 +29,9 @@ class Settings:
         self.s3_use_ssl = os.getenv("S3_USE_SSL", "false").lower() == "true"
 
         self.presign_expires_seconds = int(os.getenv("PRESIGN_EXPIRES_SECONDS", "900"))
-        self.upload_max_bytes = int(os.getenv("UPLOAD_MAX_BYTES", str(1 * 1024 * 1024 * 1024)))  # 1GB
+        self.upload_max_bytes = int(
+            os.getenv("UPLOAD_MAX_BYTES", str(1 * 1024 * 1024 * 1024))
+        )  # 1GB
         self.upload_allowed_mime = os.getenv("UPLOAD_ALLOWED_MIME", "video/mp4")
 
         # Worker / FFmpeg settings
@@ -35,13 +39,23 @@ class Settings:
         self.ffprobe_bin = os.getenv("FFPROBE_BIN", "ffprobe")
 
         self.ffprobe_timeout_seconds = int(os.getenv("FFPROBE_TIMEOUT_SECONDS", "30"))
-        self.ffmpeg_timeout_720p_seconds = int(os.getenv("FFMPEG_TIMEOUT_720P_SECONDS", "1200"))
-        self.ffmpeg_timeout_480p_seconds = int(os.getenv("FFMPEG_TIMEOUT_480P_SECONDS", "900"))
-        self.thumbnail_timeout_seconds = int(os.getenv("THUMBNAIL_TIMEOUT_SECONDS", "30"))
+        self.ffmpeg_timeout_720p_seconds = int(
+            os.getenv("FFMPEG_TIMEOUT_720P_SECONDS", "1200")
+        )
+        self.ffmpeg_timeout_480p_seconds = int(
+            os.getenv("FFMPEG_TIMEOUT_480P_SECONDS", "900")
+        )
+        self.thumbnail_timeout_seconds = int(
+            os.getenv("THUMBNAIL_TIMEOUT_SECONDS", "30")
+        )
 
-        self.worker_lock_ttl_ms = int(os.getenv("WORKER_LOCK_TTL_MS", str(15 * 60 * 1000)))
+        self.worker_lock_ttl_ms = int(
+            os.getenv("WORKER_LOCK_TTL_MS", str(15 * 60 * 1000))
+        )
         backoff_csv = os.getenv("WORKER_BACKOFF_SECONDS", "30,120,300")
-        self.worker_backoff_seconds = [int(x.strip()) for x in backoff_csv.split(",") if x.strip()]
+        self.worker_backoff_seconds = [
+            int(x.strip()) for x in backoff_csv.split(",") if x.strip()
+        ]
 
         # OpenSearch
         self.opensearch_url = os.getenv("OPENSEARCH_URL", "http://localhost:9200")
@@ -50,13 +64,17 @@ class Settings:
 
         # Search thresholds
         self.min_meta_coverage = float(os.getenv("MIN_META_COVERAGE", "0.0"))
-        self.min_transcript_coverage = float(os.getenv("MIN_TRANSCRIPT_COVERAGE", "0.25"))
+        self.min_transcript_coverage = float(
+            os.getenv("MIN_TRANSCRIPT_COVERAGE", "0.25")
+        )
 
         # Transcription / Whisper settings
         self.whisper_enabled = os.getenv("WHISPER_ENABLED", "true").lower() == "true"
         self.whisper_model = os.getenv("WHISPER_MODEL", "base.en")
         self.whisper_lang = os.getenv("WHISPER_LANG", "en")
-        self.whisper_use_openai_fallback = os.getenv("WHISPER_USE_OPENAI_FALLBACK", "true").lower() == "true"
+        self.whisper_use_openai_fallback = (
+            os.getenv("WHISPER_USE_OPENAI_FALLBACK", "true").lower() == "true"
+        )
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
         # Email / SMTP
@@ -70,6 +88,9 @@ class Settings:
         self.smtp_ssl = os.getenv("SMTP_SSL", "false").lower() == "true"
 
         # Public base URL (for links in emails)
-        self.public_web_base_url = os.getenv("PUBLIC_WEB_BASE_URL", "http://localhost:3000")
+        self.public_web_base_url = os.getenv(
+            "PUBLIC_WEB_BASE_URL", "http://localhost:3000"
+        )
+
 
 settings = Settings()

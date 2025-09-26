@@ -1,3 +1,4 @@
+# apps/api/notifier.py
 import os
 import json
 import time
@@ -21,11 +22,14 @@ log = logging.getLogger("notifier")
 app = FastAPI(title="Streemm Notifier")
 _stop_event = threading.Event()
 
+
 def _lock_key(video_id: str) -> str:
     return f"lock:email:{video_id}"
 
+
 def _attempts_key(video_id: str) -> str:
     return f"attempts:email:{video_id}"
+
 
 def acquire_lock(video_id: str, worker_id: str, ttl_ms: int) -> bool:
     try:
@@ -33,6 +37,7 @@ def acquire_lock(video_id: str, worker_id: str, ttl_ms: int) -> bool:
         return bool(ok)
     except Exception:
         return False
+
 
 def release_lock(video_id: str, worker_id: str) -> None:
     try:
@@ -42,9 +47,11 @@ def release_lock(video_id: str, worker_id: str) -> None:
     except Exception:
         pass
 
+
 def _backoff_for_attempt(attempt: int):
     arr = settings.worker_backoff_seconds
     return arr[attempt - 1] if 1 <= attempt <= len(arr) else None
+
 
 def notify_video_ready(video_id: str, reason: str) -> None:
     worker_id = f"pid:{os.getpid()}-thr:{threading.get_ident()}"
@@ -56,23 +63,40 @@ def notify_video_ready(video_id: str, reason: str) -> None:
         with SessionLocal() as db:
             v = db.get(Video, uuid.UUID(video_id))
             if not v:
-                log.warning(json.dumps({"video_id": video_id, "step": "load", "error": "missing_video"}))
+                log.warning(
+                    json.dumps(
+                        {"video_id": video_id, "step": "load", "error": "missing_video"}
+                    )
+                )
                 return
 
             if v.status != "ready" or v.notified_at is not None:
-                log.info(json.dumps({"video_id": video_id, "step": "skip", "status": v.status, "notified_at": str(v.notified_at)}))
+                log.info(
+                    json.dumps(
+                        {
+                            "video_id": video_id,
+                            "step": "skip",
+                            "status": v.status,
+                            "notified_at": str(v.notified_at),
+                        }
+                    )
+                )
                 return
 
             # Load user email
             u = db.get(User, v.user_id)
             if not u or not (u.email or "").strip():
-                log.warning(json.dumps({"video_id": video_id, "step": "load_user_email_failed"}))
+                log.warning(
+                    json.dumps({"video_id": video_id, "step": "load_user_email_failed"})
+                )
                 return
 
-            title = (v.title or v.original_filename or "your video").strip() or "your video"
+            title = (
+                v.title or v.original_filename or "your video"
+            ).strip() or "your video"
             link = f"{settings.public_web_base_url}/videos/{video_id}"
             subject = f"Your video “{title}” is ready"
-            text = f"Hi,\n\nYour video \"{title}\" is ready to watch.\n\nOpen: {link}\n\n— Streemm"
+            text = f'Hi,\n\nYour video "{title}" is ready to watch.\n\nOpen: {link}\n\n— Streemm'
 
             send_email(u.email, subject, text)
 
@@ -87,24 +111,45 @@ def notify_video_ready(video_id: str, reason: str) -> None:
         attempts = int(redis_client.incr(_attempts_key(video_id)))
         delay = _backoff_for_attempt(attempts)
         if delay is not None:
-            log.info(json.dumps({"video_id": video_id, "step": "retry", "attempts": attempts, "delay_sec": delay}))
+            log.info(
+                json.dumps(
+                    {
+                        "video_id": video_id,
+                        "step": "retry",
+                        "attempts": attempts,
+                        "delay_sec": delay,
+                    }
+                )
+            )
             time.sleep(delay)
-            redis_client.lpush(EMAIL_QUEUE_KEY, json.dumps({"video_id": video_id, "reason": "retry"}))
+            redis_client.lpush(
+                EMAIL_QUEUE_KEY, json.dumps({"video_id": video_id, "reason": "retry"})
+            )
         else:
             try:
-                redis_client.lpush(EMAIL_DLQ_KEY, json.dumps({
-                    "video_id": video_id,
-                    "error": str(e),
-                    "attempts": attempts,
-                    "reason": reason,
-                    "ts": int(time.time()),
-                }))
+                redis_client.lpush(
+                    EMAIL_DLQ_KEY,
+                    json.dumps(
+                        {
+                            "video_id": video_id,
+                            "error": str(e),
+                            "attempts": attempts,
+                            "reason": reason,
+                            "ts": int(time.time()),
+                        }
+                    ),
+                )
                 redis_client.ltrim(EMAIL_DLQ_KEY, 0, 9999)
             except Exception:
                 pass
-            log.error(json.dumps({"video_id": video_id, "step": "failed_terminal", "error": str(e)}))
+            log.error(
+                json.dumps(
+                    {"video_id": video_id, "step": "failed_terminal", "error": str(e)}
+                )
+            )
     finally:
         release_lock(video_id, worker_id)
+
 
 def _consumer_loop():
     log.info("Notifier consumer started")
@@ -124,14 +169,17 @@ def _consumer_loop():
             log.exception("notifier_loop_error")
             time.sleep(1)
 
+
 @app.on_event("startup")
 def on_startup():
     t = threading.Thread(target=_consumer_loop, daemon=True)
     t.start()
 
+
 @app.on_event("shutdown")
 def on_shutdown():
     _stop_event.set()
+
 
 @app.get("/ready")
 def ready():

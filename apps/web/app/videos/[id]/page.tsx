@@ -1,16 +1,23 @@
-'use client';
+// apps/web/app/videos/[id]/page.tsx
+"use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
-import Hls from 'hls.js';
-import { useAuth } from '../../providers/AuthProvider';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import Hls from "hls.js";
+import { useAuth } from "../../providers/AuthProvider";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
-type Asset = { kind: string; label: string; storage_key: string; public_url?: string | null };
+type Asset = {
+  kind: string;
+  label: string;
+  storage_key: string;
+  public_url?: string | null;
+};
 type Detail = {
   id: string;
-  status: 'uploaded' | 'processing' | 'ready' | 'failed';
+  status: "uploaded" | "processing" | "ready" | "failed";
   original_filename: string;
   title: string;
   description: string;
@@ -29,7 +36,7 @@ export default function VideoDetailPage() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [quality, setQuality] = useState<'720p' | '480p' | null>(null);
+  const [quality, setQuality] = useState<"720p" | "480p" | null>(null);
 
   const { getCsrf } = useAuth();
 
@@ -41,7 +48,9 @@ export default function VideoDetailPage() {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(`${API_BASE}/videos/${params.id}`, { credentials: 'include' });
+      const res = await fetch(`${API_BASE}/videos/${params.id}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error(`Failed (${res.status})`);
       const data: Detail = await res.json();
       setDetail(data);
@@ -52,49 +61,60 @@ export default function VideoDetailPage() {
     }
   }
 
-  useEffect(() => { load(); }, [params.id]);
+  useEffect(() => {
+    load();
+  }, [params.id]);
 
   // CSRF is fetched lazily via getCsrf() when sending heartbeats
   const searchParams = useSearchParams();
   useEffect(() => {
     // Prefer ?t= from URL if present, else server-provided resume
-    const tParam = Number(searchParams.get('t'));
+    const tParam = Number(searchParams.get("t"));
     if (!Number.isNaN(tParam) && Number.isFinite(tParam) && tParam >= 0) {
       resumeRef.current = Math.max(0, Math.floor(tParam));
       resumeAppliedRef.current = false;
       return;
     }
     if (!detail) return;
-    const t = typeof detail.resume_from_seconds === 'number' ? detail.resume_from_seconds || 0 : 0;
+    const t =
+      typeof detail.resume_from_seconds === "number"
+        ? detail.resume_from_seconds || 0
+        : 0;
     resumeRef.current = Math.max(0, t);
     resumeAppliedRef.current = false;
   }, [detail, searchParams]);
 
   const poster = useMemo(
-    () => detail?.assets.find(a => a.kind === 'thumbnail' && a.label === 'poster')?.public_url || undefined,
-    [detail]
+    () =>
+      detail?.assets.find((a) => a.kind === "thumbnail" && a.label === "poster")
+        ?.public_url || undefined,
+    [detail],
   );
 
   const hls720 = useMemo(
-    () => detail?.assets.find(a => a.kind === 'hls' && a.label === '720p')?.public_url || null,
-    [detail]
+    () =>
+      detail?.assets.find((a) => a.kind === "hls" && a.label === "720p")
+        ?.public_url || null,
+    [detail],
   );
   const hls480 = useMemo(
-    () => detail?.assets.find(a => a.kind === 'hls' && a.label === '480p')?.public_url || null,
-    [detail]
+    () =>
+      detail?.assets.find((a) => a.kind === "hls" && a.label === "480p")
+        ?.public_url || null,
+    [detail],
   );
 
   // Default quality: 720p if available, else 480p
   useEffect(() => {
     if (!detail) return;
-    if (hls720) setQuality(q => q ?? '720p');
-    else if (hls480) setQuality(q => q ?? '480p');
+    if (hls720) setQuality((q) => q ?? "720p");
+    else if (hls480) setQuality((q) => q ?? "480p");
     else setQuality(null);
   }, [detail, hls720, hls480]);
 
   const hlsSrc = useMemo(() => {
-    if (quality === '720p') return hls720;
-    if (quality === '480p') return hls480;
+    if (quality === "720p") return hls720;
+    if (quality === "480p") return hls480;
     return null;
   }, [quality, hls720, hls480]);
 
@@ -113,7 +133,7 @@ export default function VideoDetailPage() {
       hlsRef.current = null;
     }
 
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
       const onLoaded = () => {
         try {
           const start = resumeAppliedRef.current ? prevTime : resumeRef.current;
@@ -126,11 +146,11 @@ export default function VideoDetailPage() {
           }
         } catch {}
       };
-      video.addEventListener('loadedmetadata', onLoaded);
+      video.addEventListener("loadedmetadata", onLoaded);
       video.src = src;
       video.load();
       return () => {
-        video.removeEventListener('loadedmetadata', onLoaded);
+        video.removeEventListener("loadedmetadata", onLoaded);
       };
     } else if (Hls.isSupported()) {
       const hls = new Hls({ maxMaxBufferLength: 60 });
@@ -165,10 +185,10 @@ export default function VideoDetailPage() {
     };
     async function postOnce(token: string) {
       return fetch(`${API_BASE}/history/heartbeat`, {
-        method: 'POST',
-        credentials: 'include',
+        method: "POST",
+        credentials: "include",
         keepalive: true,
-        headers: { 'content-type': 'application/json', 'x-csrf-token': token },
+        headers: { "content-type": "application/json", "x-csrf-token": token },
         body: JSON.stringify(payload),
       });
     }
@@ -182,53 +202,56 @@ export default function VideoDetailPage() {
     } catch {}
   }
 
-// Heartbeats: throttle via timeupdate (~10s), plus on playing/pause/ended/tab hide/unload
-useEffect(() => {
-  const video = videoRef.current;
-  if (!video) return;
+  // Heartbeats: throttle via timeupdate (~10s), plus on playing/pause/ended/tab hide/unload
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
 
-  let lastSentMs = 0;
-  const THROTTLE_MS = 10000;
+    let lastSentMs = 0;
+    const THROTTLE_MS = 10000;
 
-  const sendNow = () => sendHeartbeat(video.currentTime || 0);
+    const sendNow = () => sendHeartbeat(video.currentTime || 0);
 
-  const onPlaying = () => sendNow();
-  const onPause = () => sendNow();
-  const onEnded = () => sendNow();
-  const onTimeUpdate = () => {
-    const now = Date.now();
-    if (now - lastSentMs >= THROTTLE_MS && !video.paused && !video.ended) {
-      lastSentMs = now;
-      sendNow();
-    }
-  };
-  const onBeforeUnload = () => sendNow();
-  const onVisibilityChange = () => {
-    if (document.visibilityState === 'hidden') sendNow();
-  };
+    const onPlaying = () => sendNow();
+    const onPause = () => sendNow();
+    const onEnded = () => sendNow();
+    const onTimeUpdate = () => {
+      const now = Date.now();
+      if (now - lastSentMs >= THROTTLE_MS && !video.paused && !video.ended) {
+        lastSentMs = now;
+        sendNow();
+      }
+    };
+    const onBeforeUnload = () => sendNow();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") sendNow();
+    };
 
-  video.addEventListener('playing', onPlaying);
-  video.addEventListener('pause', onPause);
-  video.addEventListener('ended', onEnded);
-  video.addEventListener('timeupdate', onTimeUpdate);
-  window.addEventListener('beforeunload', onBeforeUnload);
-  document.addEventListener('visibilitychange', onVisibilityChange);
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("pause", onPause);
+    video.addEventListener("ended", onEnded);
+    video.addEventListener("timeupdate", onTimeUpdate);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
-  return () => {
-    video.removeEventListener('playing', onPlaying);
-    video.removeEventListener('pause', onPause);
-    video.removeEventListener('ended', onEnded);
-    video.removeEventListener('timeupdate', onTimeUpdate);
-    window.removeEventListener('beforeunload', onBeforeUnload);
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-  };
-}, [hlsSrc, params.id]);
+    return () => {
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("pause", onPause);
+      video.removeEventListener("ended", onEnded);
+      video.removeEventListener("timeupdate", onTimeUpdate);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [hlsSrc, params.id]);
 
-  if (loading) return <div className="px-6 py-6 text-sm text-neutral-400">Loading…</div>;
-  if (err) return <div className="px-6 py-6 text-sm text-red-400">Error: {err}</div>;
+  if (loading)
+    return <div className="px-6 py-6 text-sm text-neutral-400">Loading…</div>;
+  if (err)
+    return <div className="px-6 py-6 text-sm text-red-400">Error: {err}</div>;
   if (!detail) return null;
 
-  const name = (detail.title && detail.title.trim()) || detail.original_filename;
+  const name =
+    (detail.title && detail.title.trim()) || detail.original_filename;
 
   return (
     <div className="px-10 py-6">
@@ -238,19 +261,23 @@ useEffect(() => {
         <div className="flex items-center gap-2">
           <span className="text-sm text-neutral-400">Quality:</span>
           <button
-            onClick={() => setQuality('720p')}
+            onClick={() => setQuality("720p")}
             disabled={!hls720}
             className={`text-sm px-3 py-1 rounded-md border ${
-              quality === '720p' ? 'border-neutral-500 text-neutral-100' : 'border-neutral-700 text-neutral-300'
+              quality === "720p"
+                ? "border-neutral-500 text-neutral-100"
+                : "border-neutral-700 text-neutral-300"
             } disabled:opacity-50`}
           >
             720p
           </button>
           <button
-            onClick={() => setQuality('480p')}
+            onClick={() => setQuality("480p")}
             disabled={!hls480}
             className={`text-sm px-3 py-1 rounded-md border ${
-              quality === '480p' ? 'border-neutral-500 text-neutral-100' : 'border-neutral-700 text-neutral-300'
+              quality === "480p"
+                ? "border-neutral-500 text-neutral-100"
+                : "border-neutral-700 text-neutral-300"
             } disabled:opacity-50`}
           >
             480p

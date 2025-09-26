@@ -32,8 +32,13 @@ def check_upload_rate_limit(user_id: str) -> None:
             detail="Too many uploads, try again soon.",
         )
 
-@router.post("/uploads/presign", response_model=PresignResponse, status_code=status.HTTP_200_OK)
-def presign_upload(request: Request, body: PresignRequest, user: User = Depends(get_current_user)):
+
+@router.post(
+    "/uploads/presign", response_model=PresignResponse, status_code=status.HTTP_200_OK
+)
+def presign_upload(
+    request: Request, body: PresignRequest, user: User = Depends(get_current_user)
+):
     require_csrf(request)
 
     check_upload_rate_limit(str(user.id))
@@ -55,4 +60,6 @@ def presign_upload(request: Request, body: PresignRequest, user: User = Depends(
 
     # Client should set these headers on the PUT
     headers = {"Content-Type": body.content_type}
-    return PresignResponse(video_id=video_id, raw_key=raw_key, put_url=put_url, headers=headers)
+    return PresignResponse(
+        video_id=video_id, raw_key=raw_key, put_url=put_url, headers=headers
+    )

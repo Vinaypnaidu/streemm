@@ -1,3 +1,4 @@
+# apps/api/worker.py
 import os
 import json
 import uuid
@@ -14,7 +15,14 @@ from db import SessionLocal, healthcheck as db_health
 from models import Video, VideoAsset
 from jobs import QUEUE_KEY, DLQ_KEY, enqueue_notify_video_ready
 from config import settings
-from storage import download_object, object_exists, build_hls_key, build_thumbnail_key, upload_dir, build_caption_key
+from storage import (
+    download_object,
+    object_exists,
+    build_hls_key,
+    build_thumbnail_key,
+    upload_dir,
+    build_caption_key,
+)
 from search import index_video_metadata
 
 logging.basicConfig(level=logging.INFO)
@@ -24,11 +32,14 @@ app = FastAPI(title="Streemm Worker")
 
 _stop_event = threading.Event()
 
+
 def _lock_key(video_id: str) -> str:
     return f"lock:video:{video_id}"
 
+
 def _attempts_key(video_id: str) -> str:
     return f"attempts:video:{video_id}"
+
 
 def acquire_lock(video_id: str, worker_id: str, ttl_ms: int) -> bool:
     try:
@@ -37,11 +48,13 @@ def acquire_lock(video_id: str, worker_id: str, ttl_ms: int) -> bool:
     except Exception:
         return False
 
+
 def refresh_lock(video_id: str, ttl_ms: int) -> None:
     try:
         redis_client.pexpire(_lock_key(video_id), ttl_ms)
     except Exception:
         pass
+
 
 def release_lock(video_id: str, worker_id: str) -> None:
     try:
@@ -51,9 +64,11 @@ def release_lock(video_id: str, worker_id: str) -> None:
     except Exception:
         pass
 
+
 def _backoff_for_attempt(attempt: int) -> Optional[int]:
     arr = settings.worker_backoff_seconds
     return arr[attempt - 1] if 1 <= attempt <= len(arr) else None
+
 
 def _lock_refresher(video_id: str, worker_id: str, stop: threading.Event):
     interval = max(5, min(60, settings.worker_lock_ttl_ms // 3000))
@@ -61,22 +76,30 @@ def _lock_refresher(video_id: str, worker_id: str, stop: threading.Event):
         time.sleep(interval)
         refresh_lock(video_id, settings.worker_lock_ttl_ms)
 
+
 def _run_ffprobe(path: str) -> dict:
     t0 = time.time()
     cmd = [
         settings.ffprobe_bin,
-        "-v", "error",
+        "-v",
+        "error",
         "-show_format",
         "-show_streams",
-        "-of", "json",
+        "-of",
+        "json",
         path,
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=settings.ffprobe_timeout_seconds)
+    res = subprocess.run(
+        cmd, capture_output=True, text=True, timeout=settings.ffprobe_timeout_seconds
+    )
     dt = int((time.time() - t0) * 1000)
     if res.returncode != 0:
-        raise RuntimeError(f"ffprobe failed: code={res.returncode} err={res.stderr.strip()}")
+        raise RuntimeError(
+            f"ffprobe failed: code={res.returncode} err={res.stderr.strip()}"
+        )
     log.info(json.dumps({"step": "ffprobe", "duration_ms": dt}))
     return json.loads(res.stdout)
+
 
 def _parse_fps_from_probe(probe: dict) -> float:
     # Look for the first video stream
@@ -94,6 +117,7 @@ def _parse_fps_from_probe(probe: dict) -> float:
                         pass
     return 30.0  # fallback
 
+
 def _derive_gop_2s(fps: float) -> int:
     try:
         g = int(round(fps * 2.0))
@@ -101,34 +125,58 @@ def _derive_gop_2s(fps: float) -> int:
     except Exception:
         return 60
 
+
 def _transcode_hls_720p(src_path: str, out_dir: str, gop: int) -> None:
     os.makedirs(out_dir, exist_ok=True)
     playlist = os.path.join(out_dir, "index.m3u8")
     seg_pat = os.path.join(out_dir, "seg_%03d.ts")
     t0 = time.time()
     cmd = [
-        settings.ffmpeg_bin, "-y",
-        "-i", src_path,
-        "-vf", "scale=-2:720",
-        "-c:v", "h264",
-        "-profile:v", "main",
-        "-crf", "20",
-        "-preset", "veryfast",
-        "-g", str(gop),
-        "-keyint_min", str(gop),
-        "-sc_threshold", "0",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-hls_time", "4",
-        "-hls_playlist_type", "vod",
-        "-hls_segment_filename", seg_pat,
+        settings.ffmpeg_bin,
+        "-y",
+        "-i",
+        src_path,
+        "-vf",
+        "scale=-2:720",
+        "-c:v",
+        "h264",
+        "-profile:v",
+        "main",
+        "-crf",
+        "20",
+        "-preset",
+        "veryfast",
+        "-g",
+        str(gop),
+        "-keyint_min",
+        str(gop),
+        "-sc_threshold",
+        "0",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-hls_time",
+        "4",
+        "-hls_playlist_type",
+        "vod",
+        "-hls_segment_filename",
+        seg_pat,
         playlist,
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=settings.ffmpeg_timeout_720p_seconds)
+    res = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=settings.ffmpeg_timeout_720p_seconds,
+    )
     dt = int((time.time() - t0) * 1000)
     if res.returncode != 0:
-        raise RuntimeError(f"ffmpeg(720p) failed: code={res.returncode} err={res.stderr.strip()}")
+        raise RuntimeError(
+            f"ffmpeg(720p) failed: code={res.returncode} err={res.stderr.strip()}"
+        )
     log.info(json.dumps({"step": "hls_720p", "duration_ms": dt}))
+
 
 def _transcode_hls_480p(src_path: str, out_dir: str, gop: int) -> None:
     os.makedirs(out_dir, exist_ok=True)
@@ -136,62 +184,100 @@ def _transcode_hls_480p(src_path: str, out_dir: str, gop: int) -> None:
     seg_pat = os.path.join(out_dir, "seg_%03d.ts")
     t0 = time.time()
     cmd = [
-        settings.ffmpeg_bin, "-y",
-        "-i", src_path,
-        "-vf", "scale=-2:480",
-        "-c:v", "h264",
-        "-profile:v", "main",
-        "-crf", "22",
-        "-preset", "veryfast",
-        "-g", str(gop),
-        "-keyint_min", str(gop),
-        "-sc_threshold", "0",
-        "-c:a", "aac",
-        "-b:a", "96k",
-        "-hls_time", "4",
-        "-hls_playlist_type", "vod",
-        "-hls_segment_filename", seg_pat,
+        settings.ffmpeg_bin,
+        "-y",
+        "-i",
+        src_path,
+        "-vf",
+        "scale=-2:480",
+        "-c:v",
+        "h264",
+        "-profile:v",
+        "main",
+        "-crf",
+        "22",
+        "-preset",
+        "veryfast",
+        "-g",
+        str(gop),
+        "-keyint_min",
+        str(gop),
+        "-sc_threshold",
+        "0",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "96k",
+        "-hls_time",
+        "4",
+        "-hls_playlist_type",
+        "vod",
+        "-hls_segment_filename",
+        seg_pat,
         playlist,
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=settings.ffmpeg_timeout_480p_seconds)
+    res = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=settings.ffmpeg_timeout_480p_seconds,
+    )
     dt = int((time.time() - t0) * 1000)
     if res.returncode != 0:
-        raise RuntimeError(f"ffmpeg(480p) failed: code={res.returncode} err={res.stderr.strip()}")
+        raise RuntimeError(
+            f"ffmpeg(480p) failed: code={res.returncode} err={res.stderr.strip()}"
+        )
     log.info(json.dumps({"step": "hls_480p", "duration_ms": dt}))
+
 
 def _generate_thumbnail(src_path: str, out_path: str) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     t0 = time.time()
     cmd = [
-        settings.ffmpeg_bin, "-y",
-        "-ss", "00:00:00.000",
-        "-i", src_path,
-        "-frames:v", "1",
-        "-q:v", "2",
+        settings.ffmpeg_bin,
+        "-y",
+        "-ss",
+        "00:00:00.000",
+        "-i",
+        src_path,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "2",
         out_path,
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=settings.thumbnail_timeout_seconds)
+    res = subprocess.run(
+        cmd, capture_output=True, text=True, timeout=settings.thumbnail_timeout_seconds
+    )
     dt = int((time.time() - t0) * 1000)
     if res.returncode != 0:
-        raise RuntimeError(f"ffmpeg(thumbnail) failed: code={res.returncode} err={res.stderr.strip()}")
+        raise RuntimeError(
+            f"ffmpeg(thumbnail) failed: code={res.returncode} err={res.stderr.strip()}"
+        )
     log.info(json.dumps({"step": "thumbnail", "duration_ms": dt}))
+
 
 def _write_vtt(segments, out_path: str) -> None:
     # segments: iterable of {"start": float, "end": float, "text": str}
     def _fmt(t: float) -> str:
-        h = int(t // 3600); m = int((t % 3600) // 60); s = t % 60
-        return f"{h:02d}:{m:02d}:{s:06.3f}".replace('.', ',')
+        h = int(t // 3600)
+        m = int((t % 3600) // 60)
+        s = t % 60
+        return f"{h:02d}:{m:02d}:{s:06.3f}".replace(".", ",")
+
     lines = ["WEBVTT", ""]
     for i, seg in enumerate(segments, 1):
-        start = float(seg.get("start", 0.0)); end = float(seg.get("end", 0.0))
+        start = float(seg.get("start", 0.0))
+        end = float(seg.get("end", 0.0))
         text = (seg.get("text") or "").strip()
         lines.append(str(i))
         lines.append(f"{_fmt(start)} --> {_fmt(end)}")
         lines.append(text)
         lines.append("")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, 'w', encoding='utf-8') as f:
+    with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
+
 
 def _transcribe_with_faster_whisper(audio_path: str, model_name: str, language: str):
     try:
@@ -203,10 +289,18 @@ def _transcribe_with_faster_whisper(audio_path: str, model_name: str, language: 
         segments, _info = model.transcribe(audio_path, language=language)
         out = []
         for s in segments:
-            out.append({"start": float(s.start), "end": float(s.end), "text": (s.text or "").strip(), "lang": language})
+            out.append(
+                {
+                    "start": float(s.start),
+                    "end": float(s.end),
+                    "text": (s.text or "").strip(),
+                    "lang": language,
+                }
+            )
         return out
     except Exception:
         return None
+
 
 def _transcribe_with_openai(audio_path: str, language: str):
     try:
@@ -218,46 +312,83 @@ def _transcribe_with_openai(audio_path: str, language: str):
         return None
     try:
         client = OpenAI(api_key=api_key)
-        with open(audio_path, 'rb') as f:
-            tr = client.audio.transcriptions.create(model="whisper-1", file=f, language=language)
+        with open(audio_path, "rb") as f:
+            tr = client.audio.transcriptions.create(
+                model="whisper-1", file=f, language=language
+            )
         # OpenAI returns text without timestamps; fall back to single segment
-        txt = (getattr(tr, 'text', None) or '').strip()
+        txt = (getattr(tr, "text", None) or "").strip()
         if not txt:
             return None
         return [{"start": 0.0, "end": 0.0, "text": txt, "lang": language}]
     except Exception:
         return None
 
+
 def _chunk_segments(segments, min_len: int = 80, max_len: int = 200):
     chunks = []
-    cur_text = ""; cur_start = None; cur_end = None
+    cur_text = ""
+    cur_start = None
+    cur_end = None
     for seg in segments:
         text = (seg.get("text") or "").strip()
         if not text:
             continue
-        s = float(seg.get("start", 0.0)); e = float(seg.get("end", s))
+        s = float(seg.get("start", 0.0))
+        e = float(seg.get("end", s))
         if cur_start is None:
             cur_start = s
         candidate = (cur_text + " " + text).strip() if cur_text else text
         if len(candidate) <= max_len:
-            cur_text = candidate; cur_end = e
+            cur_text = candidate
+            cur_end = e
             if len(cur_text) >= min_len:
-                chunks.append({"start_seconds": cur_start, "end_seconds": cur_end, "text": cur_text, "lang": settings.whisper_lang})
-                cur_text = ""; cur_start = None; cur_end = None
+                chunks.append(
+                    {
+                        "start_seconds": cur_start,
+                        "end_seconds": cur_end,
+                        "text": cur_text,
+                        "lang": settings.whisper_lang,
+                    }
+                )
+                cur_text = ""
+                cur_start = None
+                cur_end = None
         else:
             if cur_text:
-                chunks.append({"start_seconds": cur_start, "end_seconds": cur_end or s, "text": cur_text, "lang": settings.whisper_lang})
-            cur_text = text; cur_start = s; cur_end = e
+                chunks.append(
+                    {
+                        "start_seconds": cur_start,
+                        "end_seconds": cur_end or s,
+                        "text": cur_text,
+                        "lang": settings.whisper_lang,
+                    }
+                )
+            cur_text = text
+            cur_start = s
+            cur_end = e
     if cur_text:
-        chunks.append({"start_seconds": cur_start or 0.0, "end_seconds": cur_end or (cur_start or 0.0), "text": cur_text, "lang": settings.whisper_lang})
+        chunks.append(
+            {
+                "start_seconds": cur_start or 0.0,
+                "end_seconds": cur_end or (cur_start or 0.0),
+                "text": cur_text,
+                "lang": settings.whisper_lang,
+            }
+        )
     return chunks
 
+
 def _upsert_asset_720p(db, video_id: uuid.UUID, playlist_key: str) -> None:
-    existing = db.query(VideoAsset).filter(
-        VideoAsset.video_id == video_id,
-        VideoAsset.kind == "hls",
-        VideoAsset.label == "720p",
-    ).first()
+    existing = (
+        db.query(VideoAsset)
+        .filter(
+            VideoAsset.video_id == video_id,
+            VideoAsset.kind == "hls",
+            VideoAsset.label == "720p",
+        )
+        .first()
+    )
     if existing:
         if existing.storage_key != playlist_key:
             existing.storage_key = playlist_key
@@ -273,59 +404,96 @@ def _upsert_asset_720p(db, video_id: uuid.UUID, playlist_key: str) -> None:
         db.add(a)
         db.commit()
 
+
 def _upsert_asset_480p(db, video_id: uuid.UUID, playlist_key: str) -> None:
-    existing = db.query(VideoAsset).filter(
-        VideoAsset.video_id == video_id,
-        VideoAsset.kind == "hls",
-        VideoAsset.label == "480p",
-    ).first()
+    existing = (
+        db.query(VideoAsset)
+        .filter(
+            VideoAsset.video_id == video_id,
+            VideoAsset.kind == "hls",
+            VideoAsset.label == "480p",
+        )
+        .first()
+    )
     if existing:
         if existing.storage_key != playlist_key:
             existing.storage_key = playlist_key
         db.commit()
     else:
-        a = VideoAsset(video_id=video_id, kind="hls", label="480p", storage_key=playlist_key, meta=None)
+        a = VideoAsset(
+            video_id=video_id,
+            kind="hls",
+            label="480p",
+            storage_key=playlist_key,
+            meta=None,
+        )
         db.add(a)
         db.commit()
 
+
 def _upsert_thumbnail(db, video_id: uuid.UUID, key: str) -> None:
-    existing = db.query(VideoAsset).filter(
-        VideoAsset.video_id == video_id,
-        VideoAsset.kind == "thumbnail",
-        VideoAsset.label == "poster",
-    ).first()
+    existing = (
+        db.query(VideoAsset)
+        .filter(
+            VideoAsset.video_id == video_id,
+            VideoAsset.kind == "thumbnail",
+            VideoAsset.label == "poster",
+        )
+        .first()
+    )
     if existing:
         if existing.storage_key != key:
             existing.storage_key = key
         db.commit()
     else:
-        a = VideoAsset(video_id=video_id, kind="thumbnail", label="poster", storage_key=key, meta=None)
+        a = VideoAsset(
+            video_id=video_id,
+            kind="thumbnail",
+            label="poster",
+            storage_key=key,
+            meta=None,
+        )
         db.add(a)
         db.commit()
+
 
 def process_video(video_id: str, reason: str) -> None:
     worker_id = f"pid:{os.getpid()}-thr:{threading.get_ident()}"
     got = acquire_lock(video_id, worker_id, settings.worker_lock_ttl_ms)
     if not got:
-        log.info(json.dumps({"video_id": video_id, "step": "lock_skip", "reason": "already_locked"}))
+        log.info(
+            json.dumps(
+                {"video_id": video_id, "step": "lock_skip", "reason": "already_locked"}
+            )
+        )
         return
 
     refresher_stop = threading.Event()
-    refresher = threading.Thread(target=_lock_refresher, args=(video_id, worker_id, refresher_stop), daemon=True)
+    refresher = threading.Thread(
+        target=_lock_refresher, args=(video_id, worker_id, refresher_stop), daemon=True
+    )
     refresher.start()
 
     try:
         with SessionLocal() as db:
             v = db.get(Video, uuid.UUID(video_id))
             if not v:
-                log.warning(json.dumps({"video_id": video_id, "step": "load", "error": "missing_video"}))
+                log.warning(
+                    json.dumps(
+                        {"video_id": video_id, "step": "load", "error": "missing_video"}
+                    )
+                )
                 return
             if v.status == "uploaded":
                 v.status = "processing"
                 v.error = None
                 db.commit()
 
-        log.info(json.dumps({"video_id": video_id, "step": "pipeline_start", "reason": reason}))
+        log.info(
+            json.dumps(
+                {"video_id": video_id, "step": "pipeline_start", "reason": reason}
+            )
+        )
 
         # Pull raw locally
         with SessionLocal() as db:
@@ -352,7 +520,9 @@ def process_video(video_id: str, reason: str) -> None:
                 if v:
                     v.probe = probe
                     try:
-                        v.duration_seconds = float(duration) if duration is not None else None
+                        v.duration_seconds = (
+                            float(duration) if duration is not None else None
+                        )
                     except Exception:
                         v.duration_seconds = None
                     v.error = None
@@ -370,7 +540,11 @@ def process_video(video_id: str, reason: str) -> None:
                 _transcode_hls_720p(local_raw, out_dir, gop)
                 upload_dir(settings.s3_bucket, f"hls/{video_id}/720p", out_dir)
             else:
-                log.info(json.dumps({"video_id": video_id, "step": "hls_720p", "skip": "exists"}))
+                log.info(
+                    json.dumps(
+                        {"video_id": video_id, "step": "hls_720p", "skip": "exists"}
+                    )
+                )
 
             # HLS 480p
             playlist_key_480 = build_hls_key(video_id, "480p", "index.m3u8")
@@ -380,7 +554,11 @@ def process_video(video_id: str, reason: str) -> None:
                 _transcode_hls_480p(local_raw, out_dir_480, gop)
                 upload_dir(settings.s3_bucket, f"hls/{video_id}/480p", out_dir_480)
             else:
-                log.info(json.dumps({"video_id": video_id, "step": "hls_480p", "skip": "exists"}))
+                log.info(
+                    json.dumps(
+                        {"video_id": video_id, "step": "hls_480p", "skip": "exists"}
+                    )
+                )
 
             # Thumbnail
             thumb_key = build_thumbnail_key(video_id)
@@ -389,11 +567,24 @@ def process_video(video_id: str, reason: str) -> None:
                 thumb_local = os.path.join(tmpd, "poster.jpg")
                 _generate_thumbnail(local_raw, thumb_local)
                 # Reuse upload_dir would add directory; upload single file instead:
-                from storage import client, _guess_content_type  # reuse content-type helper
+                from storage import (
+                    client,
+                    _guess_content_type,
+                )  # reuse content-type helper
+
                 c = client()
-                c.fput_object(settings.s3_bucket, thumb_key, thumb_local, content_type=_guess_content_type(thumb_local))
+                c.fput_object(
+                    settings.s3_bucket,
+                    thumb_key,
+                    thumb_local,
+                    content_type=_guess_content_type(thumb_local),
+                )
             else:
-                log.info(json.dumps({"video_id": video_id, "step": "thumbnail", "skip": "exists"}))
+                log.info(
+                    json.dumps(
+                        {"video_id": video_id, "step": "thumbnail", "skip": "exists"}
+                    )
+                )
 
             # Transcription (optional)
             caption_key = build_caption_key(video_id, settings.whisper_lang)
@@ -403,30 +594,49 @@ def process_video(video_id: str, reason: str) -> None:
                 audio_path = os.path.join(tmpd, "audio.wav")
                 try:
                     cmd = [
-                        settings.ffmpeg_bin, "-y",
-                        "-i", local_raw,
-                        "-ac", "1",
-                        "-ar", "16000",
+                        settings.ffmpeg_bin,
+                        "-y",
+                        "-i",
+                        local_raw,
+                        "-ac",
+                        "1",
+                        "-ar",
+                        "16000",
                         audio_path,
                     ]
-                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+                    res = subprocess.run(
+                        cmd, capture_output=True, text=True, timeout=600
+                    )
                     if res.returncode != 0:
-                        raise RuntimeError(f"ffmpeg(audio) failed: code={res.returncode} err={res.stderr.strip()}")
+                        raise RuntimeError(
+                            f"ffmpeg(audio) failed: code={res.returncode} err={res.stderr.strip()}"
+                        )
 
-                    segments = _transcribe_with_faster_whisper(audio_path, settings.whisper_model, settings.whisper_lang)
+                    segments = _transcribe_with_faster_whisper(
+                        audio_path, settings.whisper_model, settings.whisper_lang
+                    )
                     if segments is None and settings.whisper_use_openai_fallback:
-                        segments = _transcribe_with_openai(audio_path, settings.whisper_lang)
+                        segments = _transcribe_with_openai(
+                            audio_path, settings.whisper_lang
+                        )
 
                     if segments:
                         # Write VTT
                         vtt_local = os.path.join(tmpd, "captions.vtt")
                         _write_vtt(segments, vtt_local)
                         from storage import client, _guess_content_type
+
                         c = client()
-                        c.fput_object(settings.s3_bucket, caption_key, vtt_local, content_type=_guess_content_type(vtt_local))
+                        c.fput_object(
+                            settings.s3_bucket,
+                            caption_key,
+                            vtt_local,
+                            content_type=_guess_content_type(vtt_local),
+                        )
 
                         # Index transcript chunks in OpenSearch
                         from search import index_transcript_chunks
+
                         chunks = _chunk_segments(segments)
                         try:
                             index_transcript_chunks(video_id, chunks)
@@ -448,7 +658,7 @@ def process_video(video_id: str, reason: str) -> None:
         with SessionLocal() as db:
             v = db.get(Video, uuid.UUID(video_id))
             if v:
-                will_be_ready = (ok720 and ok480 and okthumb)
+                will_be_ready = ok720 and ok480 and okthumb
                 prev_status = v.status
                 if will_be_ready:
                     v.status = "ready"
@@ -470,16 +680,35 @@ def process_video(video_id: str, reason: str) -> None:
                     log.exception("index_video_metadata_failed_finalize")
 
         redis_client.delete(_attempts_key(video_id))
-        log.info(json.dumps({"video_id": video_id, "step": "finalize", "ready": ok720 and ok480 and okthumb}))
+        log.info(
+            json.dumps(
+                {
+                    "video_id": video_id,
+                    "step": "finalize",
+                    "ready": ok720 and ok480 and okthumb,
+                }
+            )
+        )
 
     except Exception as e:
         log.exception("process_video_failed")
         attempts = int(redis_client.incr(_attempts_key(video_id)))
         delay = _backoff_for_attempt(attempts)
         if delay is not None:
-            log.info(json.dumps({"video_id": video_id, "step": "retry", "attempts": attempts, "delay_sec": delay}))
+            log.info(
+                json.dumps(
+                    {
+                        "video_id": video_id,
+                        "step": "retry",
+                        "attempts": attempts,
+                        "delay_sec": delay,
+                    }
+                )
+            )
             time.sleep(delay)
-            redis_client.lpush(QUEUE_KEY, json.dumps({"video_id": video_id, "reason": "retry"}))
+            redis_client.lpush(
+                QUEUE_KEY, json.dumps({"video_id": video_id, "reason": "retry"})
+            )
         else:
             with SessionLocal() as db:
                 v = db.get(Video, uuid.UUID(video_id))
@@ -489,20 +718,30 @@ def process_video(video_id: str, reason: str) -> None:
                     db.commit()
                     try:
                         print(f"Pushing to DLQ: {video_id}")
-                        redis_client.lpush(DLQ_KEY, json.dumps({
-                            "video_id": video_id,
-                            "error": str(e),
-                            "attempts": attempts,
-                            "reason": reason,
-                            "ts": int(time.time())
-                        }))
+                        redis_client.lpush(
+                            DLQ_KEY,
+                            json.dumps(
+                                {
+                                    "video_id": video_id,
+                                    "error": str(e),
+                                    "attempts": attempts,
+                                    "reason": reason,
+                                    "ts": int(time.time()),
+                                }
+                            ),
+                        )
                         redis_client.ltrim(DLQ_KEY, 0, 9999)
                     except Exception:
                         pass
-            log.error(json.dumps({"video_id": video_id, "step": "failed_terminal", "error": str(e)}))
+            log.error(
+                json.dumps(
+                    {"video_id": video_id, "step": "failed_terminal", "error": str(e)}
+                )
+            )
     finally:
         refresher_stop.set()
         release_lock(video_id, worker_id)
+
 
 def _consumer_loop():
     log.info("Worker consumer started")
@@ -522,14 +761,17 @@ def _consumer_loop():
             log.exception("worker_loop_error")
             time.sleep(1)
 
+
 @app.on_event("startup")
 def on_startup():
     t = threading.Thread(target=_consumer_loop, daemon=True)
     t.start()
 
+
 @app.on_event("shutdown")
 def on_shutdown():
     _stop_event.set()
+
 
 @app.get("/ready")
 def ready():

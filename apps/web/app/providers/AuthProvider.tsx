@@ -1,9 +1,11 @@
-'use client';
+// apps/web/app/providers/AuthProvider.tsx
+"use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 type Me = { id: string; email: string } | null;
 
@@ -21,22 +23,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<Me>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/me`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE}/me`, { credentials: "include" });
         if (mounted && res.ok) setMe(await res.json());
       } finally {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   async function getCsrf(): Promise<string> {
-    const res = await fetch(`${API_BASE}/auth/csrf`, { credentials: 'include' });
+    const res = await fetch(`${API_BASE}/auth/csrf`, {
+      credentials: "include",
+    });
     const data = await res.json();
     return data.csrf as string;
   }
@@ -45,13 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const csrf = await getCsrf();
       await fetch(`${API_BASE}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'x-csrf-token': csrf },
+        method: "POST",
+        credentials: "include",
+        headers: { "x-csrf-token": csrf },
       });
     } catch {}
     setMe(null);
-    router.replace('/');
+    router.replace("/");
   }
 
   return (
@@ -63,6 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }

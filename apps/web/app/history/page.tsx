@@ -1,10 +1,12 @@
-'use client';
+// apps/web/app/history/page.tsx
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useAuth } from '../providers/AuthProvider';
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useAuth } from "../providers/AuthProvider";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 type HistoryItem = {
   video_id: string;
@@ -26,7 +28,10 @@ function ProgressBar({ percent }: { percent: number }) {
   const pct = Math.max(0, Math.min(100, Math.round(percent)));
   return (
     <div className="h-1 bg-neutral-800 rounded">
-      <div className="h-1 bg-neutral-100 rounded" style={{ width: `${pct}%` }} />
+      <div
+        className="h-1 bg-neutral-100 rounded"
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
@@ -39,7 +44,9 @@ export default function HistoryPage() {
   async function load() {
     setFetching(true);
     try {
-      const res = await fetch(`${API_BASE}/history?limit=50`, { credentials: 'include' });
+      const res = await fetch(`${API_BASE}/history?limit=50`, {
+        credentials: "include",
+      });
       if (res.ok) {
         const data: PageResp = await res.json();
         setItems(data.items || []);
@@ -49,7 +56,9 @@ export default function HistoryPage() {
     }
   }
 
-  useEffect(() => { if (!loading && me) load(); }, [loading, me]);
+  useEffect(() => {
+    if (!loading && me) load();
+  }, [loading, me]);
 
   if (loading || !me) return null;
 
@@ -63,17 +72,23 @@ export default function HistoryPage() {
         <p className="text-sm text-neutral-600">No watch history yet.</p>
       ) : (
         <div className="space-y-4">
-          {items.map(it => {
+          {items.map((it) => {
             const name = (it.title && it.title.trim()) || it.original_filename;
-            const pct = it.progress_percent ?? (
-              it.duration_seconds && it.duration_seconds > 0
+            const pct =
+              it.progress_percent ??
+              (it.duration_seconds && it.duration_seconds > 0
                 ? (it.last_position_seconds / it.duration_seconds) * 100
-                : 0
-            );
+                : 0);
             return (
-              <div key={it.video_id} className="w-full rounded-lg border border-neutral-800 bg-neutral-900">
+              <div
+                key={it.video_id}
+                className="w-full rounded-lg border border-neutral-800 bg-neutral-900"
+              >
                 <div className="flex gap-4 p-4">
-                <Link href={`/videos/${it.video_id}?t=${Math.max(0, Math.floor(it.last_position_seconds || 0))}`} className="shrink-0">
+                  <Link
+                    href={`/videos/${it.video_id}?t=${Math.max(0, Math.floor(it.last_position_seconds || 0))}`}
+                    className="shrink-0"
+                  >
                     {it.thumbnail_url ? (
                       <img
                         src={it.thumbnail_url}
@@ -87,18 +102,19 @@ export default function HistoryPage() {
                     )}
                   </Link>
                   <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/videos/${it.video_id}?t=${Math.max(0, Math.floor(it.last_position_seconds || 0))}`}
-                    className="font-medium text-sm truncate mr-3 hover:underline"
-                    title={name}
-                  >
+                    <Link
+                      href={`/videos/${it.video_id}?t=${Math.max(0, Math.floor(it.last_position_seconds || 0))}`}
+                      className="font-medium text-sm truncate mr-3 hover:underline"
+                      title={name}
+                    >
                       {name}
                     </Link>
                     <div className="mt-3">
                       <ProgressBar percent={pct} />
                     </div>
                     <div className="text-xs text-neutral-500 mt-2">
-                      Last watched: {new Date(it.last_watched_at).toLocaleString()}
+                      Last watched:{" "}
+                      {new Date(it.last_watched_at).toLocaleString()}
                     </div>
                   </div>
                 </div>

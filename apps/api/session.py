@@ -15,8 +15,10 @@ from models import User
 SESSION_PREFIX = "sess:"
 TTL = settings.session_ttl_seconds
 
+
 def _key(sid: str) -> str:
     return f"{SESSION_PREFIX}{sid}"
+
 
 def create_session(user_id: str) -> str:
     sid = secrets.token_urlsafe(32)
@@ -27,6 +29,7 @@ def create_session(user_id: str) -> str:
     redis_client.set(_key(sid), json.dumps(payload), ex=TTL)
     return sid
 
+
 def get_session(sid: str) -> Optional[Dict]:
     raw = redis_client.get(_key(sid))
     if not raw:
@@ -35,8 +38,10 @@ def get_session(sid: str) -> Optional[Dict]:
     redis_client.expire(_key(sid), TTL)
     return json.loads(raw)
 
+
 def delete_session(sid: str) -> None:
     redis_client.delete(_key(sid))
+
 
 def set_session_cookie(response: Response, sid: str) -> None:
     response.set_cookie(
@@ -49,12 +54,14 @@ def set_session_cookie(response: Response, sid: str) -> None:
         max_age=TTL,
     )
 
+
 def clear_session_cookie(response: Response) -> None:
     response.delete_cookie(
         key=settings.session_cookie_name,
         path="/",
         samesite="lax",
     )
+
 
 def get_current_user(
     request: Request,

@@ -18,9 +18,47 @@ router = APIRouter(prefix="/search", tags=["search"])
 log = logging.getLogger("routes_search")
 
 STOPWORDS: Set[str] = {
-    "a","an","the","to","is","in","on","of","for","and","or","as","at","be","by","with","from",
-    "this","that","it","you","your","are","was","were","will","can","not","we","our","they","them",
-    "their","i","me","my","mine","video","videos","watch","watched",
+    "a",
+    "an",
+    "the",
+    "to",
+    "is",
+    "in",
+    "on",
+    "of",
+    "for",
+    "and",
+    "or",
+    "as",
+    "at",
+    "be",
+    "by",
+    "with",
+    "from",
+    "this",
+    "that",
+    "it",
+    "you",
+    "your",
+    "are",
+    "was",
+    "were",
+    "will",
+    "can",
+    "not",
+    "we",
+    "our",
+    "they",
+    "them",
+    "their",
+    "i",
+    "me",
+    "my",
+    "mine",
+    "video",
+    "videos",
+    "watch",
+    "watched",
 }
 _MAX_SPAN_WINDOWS = 8
 
@@ -51,6 +89,7 @@ def _build_meta_query(q: str, limit: int, offset: int) -> Dict[str, Any]:
 
 def _iter_span_windows(tokens: List[str]) -> List[Tuple[List[str], float]]:
     """Return a capped list of (window_tokens, base_boost) pairs for span_near boosters."""
+
     def sliding(seq: List[str], k: int) -> List[List[str]]:
         if len(seq) < k:
             return []
@@ -61,7 +100,10 @@ def _iter_span_windows(tokens: List[str]) -> List[Tuple[List[str], float]]:
         wins = sliding(tokens, k)
         if wins:
             take = max(1, min(len(wins), _MAX_SPAN_WINDOWS // 2))
-            idxs = [round(i * (len(wins) - 1) / (take - 1)) if take > 1 else 0 for i in range(take)]
+            idxs = [
+                round(i * (len(wins) - 1) / (take - 1)) if take > 1 else 0
+                for i in range(take)
+            ]
             for idx in idxs:
                 windows.append((wins[idx], base_boost))
     return windows
@@ -112,8 +154,12 @@ def search(
             meta_items.append(
                 {
                     "video_id": h.get("_id"),
-                    "title_html": title_html[0] if title_html else (src.get("title") or ""),
-                    "description_html": desc_html[0] if desc_html else (src.get("description") or ""),
+                    "title_html": (
+                        title_html[0] if title_html else (src.get("title") or "")
+                    ),
+                    "description_html": (
+                        desc_html[0] if desc_html else (src.get("description") or "")
+                    ),
                     "thumbnail_url": src.get("thumbnail_url"),
                     "created_at": src.get("created_at"),
                     "duration_seconds": src.get("duration_seconds"),
@@ -122,7 +168,11 @@ def search(
             )
         total_meta = res_meta.get("hits", {}).get("total", {})
         meta_est_total = int(total_meta.get("value", 0))
-        meta_next_offset = (meta_offset + meta_limit) if (meta_est_total > meta_offset + meta_limit) else None
+        meta_next_offset = (
+            (meta_offset + meta_limit)
+            if (meta_est_total > meta_offset + meta_limit)
+            else None
+        )
     except Exception as e:
         log.error(f"Metadata search failed: {e}")
 
@@ -158,10 +208,12 @@ def search(
                 should_clauses.append(
                     {
                         "span_near": {
-                            "clauses": [{"span_term": {"text": term}} for term in window],
+                            "clauses": [
+                                {"span_term": {"text": term}} for term in window
+                            ],
                             "in_order": True,
                             "slop": slop_val,
-                            "boost": round(base_boost * (0.97 ** i), 3),
+                            "boost": round(base_boost * (0.97**i), 3),
                         }
                     }
                 )
@@ -184,7 +236,9 @@ def search(
                 bool_query.setdefault("should", []).append(
                     {
                         "dis_max": {
-                            "queries": [{"term": {"text": term}} for term in content_terms],
+                            "queries": [
+                                {"term": {"text": term}} for term in content_terms
+                            ],
                             "tie_breaker": 0.0,
                         }
                     }
@@ -260,17 +314,31 @@ def search(
                             "title": info.get(vid, {}).get("title", ""),
                             "thumbnail_url": info.get(vid, {}).get("thumbnail_url"),
                             "progress_seconds": start,
-                            "snippet_html": snippet[0] if snippet else src.get("text") or "",
+                            "snippet_html": (
+                                snippet[0] if snippet else src.get("text") or ""
+                            ),
                         }
                     )
             total_tr = res_tr.get("hits", {}).get("total", {})
             tr_est_total = int(total_tr.get("value", 0))
-            tr_next_offset = (tr_offset + tr_limit) if (tr_est_total > tr_offset + tr_limit) else None
+            tr_next_offset = (
+                (tr_offset + tr_limit)
+                if (tr_est_total > tr_offset + tr_limit)
+                else None
+            )
         except Exception as e:
             log.error(f"Transcript search failed: {e}")
 
     return {
         "search_ok": True,
-        "meta": {"items": meta_items, "estimated_total": meta_est_total, "next_offset": meta_next_offset},
-        "transcript": {"items": tr_items, "estimated_total": tr_est_total, "next_offset": tr_next_offset},
+        "meta": {
+            "items": meta_items,
+            "estimated_total": meta_est_total,
+            "next_offset": meta_next_offset,
+        },
+        "transcript": {
+            "items": tr_items,
+            "estimated_total": tr_est_total,
+            "next_offset": tr_next_offset,
+        },
     }

@@ -1,10 +1,12 @@
-'use client';
+// apps/web/app/search/page.tsx
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 type MetaItem = {
   video_id: string;
@@ -26,28 +28,40 @@ type TranscriptItem = {
 
 type SearchResponse = {
   search_ok: boolean;
-  meta: { items: MetaItem[]; estimated_total: number; next_offset?: number | null };
-  transcript: { items: TranscriptItem[]; estimated_total: number; next_offset?: number | null };
+  meta: {
+    items: MetaItem[];
+    estimated_total: number;
+    next_offset?: number | null;
+  };
+  transcript: {
+    items: TranscriptItem[];
+    estimated_total: number;
+    next_offset?: number | null;
+  };
 };
 
 function ProgressBar({ percent }: { percent: number }) {
   const pct = Math.max(0, Math.min(100, Math.round(percent)));
   return (
     <div className="h-1 bg-neutral-800 rounded">
-      <div className="h-1 bg-neutral-100 rounded" style={{ width: `${pct}%` }} />
+      <div
+        className="h-1 bg-neutral-100 rounded"
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
 
 function fmtTime(s: number) {
   const sec = Math.max(0, Math.floor(s || 0));
-  const m = Math.floor(sec / 60), r = sec % 60;
-  return `${m}:${r.toString().padStart(2, '0')}`;
+  const m = Math.floor(sec / 60),
+    r = sec % 60;
+  return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
 export default function SearchPage() {
   const sp = useSearchParams();
-  const q = (sp.get('q') || '').trim();
+  const q = (sp.get("q") || "").trim();
 
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,19 +72,26 @@ export default function SearchPage() {
 
   async function fetchDurations(ids: string[]) {
     // fetch /videos/{id} to get duration_seconds
-    const entries = await Promise.all(ids.map(async (id) => {
-      try {
-        const res = await fetch(`${API_BASE}/videos/${id}`, { credentials: 'include' });
-        if (!res.ok) return [id, null] as const;
-        const d = await res.json();
-        return [id, typeof d?.duration_seconds === 'number' ? d.duration_seconds : null] as const;
-      } catch {
-        return [id, null] as const;
-      }
-    }));
+    const entries = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const res = await fetch(`${API_BASE}/videos/${id}`, {
+            credentials: "include",
+          });
+          if (!res.ok) return [id, null] as const;
+          const d = await res.json();
+          return [
+            id,
+            typeof d?.duration_seconds === "number" ? d.duration_seconds : null,
+          ] as const;
+        } catch {
+          return [id, null] as const;
+        }
+      }),
+    );
     const m: Record<string, number | null> = {};
     for (const [id, dur] of entries) m[id] = dur;
-    setDurations(prev => ({ ...prev, ...m }));
+    setDurations((prev) => ({ ...prev, ...m }));
   }
 
   useEffect(() => {
@@ -83,15 +104,20 @@ export default function SearchPage() {
     setErr(null);
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`, { credentials: 'include' });
+        const res = await fetch(
+          `${API_BASE}/search?q=${encodeURIComponent(q)}`,
+          { credentials: "include" },
+        );
         if (!res.ok) throw new Error(`Search failed (${res.status})`);
         const json: SearchResponse = await res.json();
         setData(json);
         // After transcript results arrive, fetch durations to compute percent bars
-        const ids = Array.from(new Set((json.transcript?.items || []).map(i => i.video_id)));
+        const ids = Array.from(
+          new Set((json.transcript?.items || []).map((i) => i.video_id)),
+        );
         if (ids.length) fetchDurations(ids);
       } catch (e: any) {
-        setErr(e.message || 'Search failed');
+        setErr(e.message || "Search failed");
         setData(null);
       } finally {
         setLoading(false);
@@ -99,9 +125,18 @@ export default function SearchPage() {
     })();
   }, [q]);
 
-  if (!q) return <div className="px-12 py-8 text-sm text-neutral-400">Type a query to search.</div>;
-  if (loading && !data) return <div className="px-12 py-8 text-sm text-neutral-400">Searching…</div>;
-  if (err) return <div className="px-12 py-8 text-sm text-red-400">Error: {err}</div>;
+  if (!q)
+    return (
+      <div className="px-12 py-8 text-sm text-neutral-400">
+        Type a query to search.
+      </div>
+    );
+  if (loading && !data)
+    return (
+      <div className="px-12 py-8 text-sm text-neutral-400">Searching…</div>
+    );
+  if (err)
+    return <div className="px-12 py-8 text-sm text-red-400">Error: {err}</div>;
 
   const meta = data?.meta?.items || [];
   const tx = data?.transcript?.items || [];
@@ -119,20 +154,31 @@ export default function SearchPage() {
           ) : (
             <div className="space-y-4">
               {meta.map((it) => (
-                <div key={it.video_id} className="w-full rounded-lg border border-neutral-800 bg-neutral-900">
+                <div
+                  key={it.video_id}
+                  className="w-full rounded-lg border border-neutral-800 bg-neutral-900"
+                >
                   <div className="flex gap-4 p-4 pr-6">
                     <Link href={`/videos/${it.video_id}`} className="shrink-0">
                       {it.thumbnail_url ? (
-                        <img src={it.thumbnail_url} alt="" className="w-64 aspect-video object-cover rounded-md" />
+                        <img
+                          src={it.thumbnail_url}
+                          alt=""
+                          className="w-64 aspect-video object-cover rounded-md"
+                        />
                       ) : (
-                        <div className="w-64 aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">No thumbnail</div>
+                        <div className="w-64 aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">
+                          No thumbnail
+                        </div>
                       )}
                     </Link>
                     <div className="min-w-0 flex-1 pr-4">
                       <Link
                         href={`/videos/${it.video_id}`}
                         className="block font-medium text-sm hover:underline line-clamp-2"
-                        dangerouslySetInnerHTML={{ __html: it.title_html || '' }}
+                        dangerouslySetInnerHTML={{
+                          __html: it.title_html || "",
+                        }}
                       />
                     </div>
                   </div>
@@ -146,20 +192,35 @@ export default function SearchPage() {
         <section>
           <h2 className="text-xl font-semibold mb-3">Jump To Moments</h2>
           {tx.length === 0 ? (
-            <div className="text-sm text-neutral-500">No transcript matches.</div>
+            <div className="text-sm text-neutral-500">
+              No transcript matches.
+            </div>
           ) : (
             <div className="space-y-4">
               {tx.map((it) => {
                 const dur = durations[it.video_id] ?? null;
-                const pct = dur && dur > 0 ? (it.progress_seconds / dur) * 100 : 0;
+                const pct =
+                  dur && dur > 0 ? (it.progress_seconds / dur) * 100 : 0;
                 return (
-                  <div key={it.video_id} className="w-full rounded-lg border border-neutral-800 bg-neutral-900">
+                  <div
+                    key={it.video_id}
+                    className="w-full rounded-lg border border-neutral-800 bg-neutral-900"
+                  >
                     <div className="flex gap-4 p-4">
-                      <Link href={`/videos/${it.video_id}?t=${Math.max(0, Math.floor(it.progress_seconds))}`} className="shrink-0">
+                      <Link
+                        href={`/videos/${it.video_id}?t=${Math.max(0, Math.floor(it.progress_seconds))}`}
+                        className="shrink-0"
+                      >
                         {it.thumbnail_url ? (
-                          <img src={it.thumbnail_url} alt="" className="w-64 aspect-video object-cover rounded-md" />
+                          <img
+                            src={it.thumbnail_url}
+                            alt=""
+                            className="w-64 aspect-video object-cover rounded-md"
+                          />
                         ) : (
-                          <div className="w-64 aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">No thumbnail</div>
+                          <div className="w-64 aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">
+                            No thumbnail
+                          </div>
                         )}
                       </Link>
                       <div className="min-w-0 flex-1">
@@ -170,8 +231,15 @@ export default function SearchPage() {
                         >
                           {it.title}
                         </Link>
-                        <div className="text-xs text-neutral-400 mt-1" dangerouslySetInnerHTML={{ __html: it.snippet_html || '' }} />
-                        <div className="text-xs text-neutral-500 mt-2">Starts at {fmtTime(it.progress_seconds)}</div>
+                        <div
+                          className="text-xs text-neutral-400 mt-1"
+                          dangerouslySetInnerHTML={{
+                            __html: it.snippet_html || "",
+                          }}
+                        />
+                        <div className="text-xs text-neutral-500 mt-2">
+                          Starts at {fmtTime(it.progress_seconds)}
+                        </div>
                         <div className="mt-2">
                           <ProgressBar percent={pct} />
                         </div>

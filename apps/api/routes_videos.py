@@ -21,7 +21,15 @@ from schemas import (
     Ok,
     PublicVideoDetail,
 )
-from storage import build_raw_key, object_exists, build_public_url, build_thumbnail_key, delete_object, delete_prefix, build_caption_key
+from storage import (
+    build_raw_key,
+    object_exists,
+    build_public_url,
+    build_thumbnail_key,
+    delete_object,
+    delete_prefix,
+    build_caption_key,
+)
 from jobs import enqueue_process_video
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -29,9 +37,10 @@ from search import index_video_metadata, delete_video_from_search
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
+
 def _video_to_detail(v: Video) -> VideoDetail:
     assets_out: List[VideoAssetOut] = []
-    for a in (v.assets or []):
+    for a in v.assets or []:
         assets_out.append(
             VideoAssetOut(
                 id=str(a.id),
@@ -49,13 +58,16 @@ def _video_to_detail(v: Video) -> VideoDetail:
         description=v.description or "",
         original_filename=v.original_filename,
         storage_key_raw=v.storage_key_raw,
-        duration_seconds=float(v.duration_seconds) if v.duration_seconds is not None else None,
+        duration_seconds=(
+            float(v.duration_seconds) if v.duration_seconds is not None else None
+        ),
         checksum_sha256=v.checksum_sha256,
         probe=v.probe,
         error=v.error,
         created_at=v.created_at,
         assets=assets_out,
     )
+
 
 def _video_to_public_detail(
     v: Video,
@@ -64,7 +76,7 @@ def _video_to_public_detail(
     progress_percent: Optional[float] = None,
 ) -> PublicVideoDetail:
     assets_out: List[VideoAssetOut] = []
-    for a in (v.assets or []):
+    for a in v.assets or []:
         assets_out.append(
             VideoAssetOut(
                 id=str(a.id),
@@ -81,13 +93,16 @@ def _video_to_public_detail(
         title=v.title or "",
         description=v.description or "",
         original_filename=v.original_filename,
-        duration_seconds=float(v.duration_seconds) if v.duration_seconds is not None else None,
+        duration_seconds=(
+            float(v.duration_seconds) if v.duration_seconds is not None else None
+        ),
         error=v.error,
         created_at=v.created_at,
         assets=assets_out,
         resume_from_seconds=resume_from_seconds,
         progress_percent=progress_percent,
     )
+
 
 @router.post("", response_model=VideoDetail, status_code=status.HTTP_202_ACCEPTED)
 def finalize_video(
@@ -109,12 +124,16 @@ def finalize_video(
     ext = ext or ".mp4"
     expected_key = build_raw_key(str(user.id), str(vid), ext)
     if body.raw_key != expected_key:
-        raise HTTPException(status_code=400, detail="raw_key does not match expected convention")
+        raise HTTPException(
+            status_code=400, detail="raw_key does not match expected convention"
+        )
 
     # Ensure object exists in storage
     exists, _meta = object_exists(settings.s3_bucket, body.raw_key)
     if not exists:
-        raise HTTPException(status_code=409, detail="Raw object not found in storage. Upload first.")
+        raise HTTPException(
+            status_code=409, detail="Raw object not found in storage. Upload first."
+        )
 
     # Idempotent: fetch or create
     existing: Optional[Video] = db.get(Video, vid)
@@ -122,7 +141,9 @@ def finalize_video(
         if existing.user_id != user.id:
             raise HTTPException(status_code=403, detail="Forbidden")
         if existing.storage_key_raw != body.raw_key:
-            raise HTTPException(status_code=409, detail="Video exists with different raw key")
+            raise HTTPException(
+                status_code=409, detail="Video exists with different raw key"
+            )
         # Enqueue again is safe (idempotent from worker side later)
         enqueue_process_video(str(existing.id), reason="finalize-idempotent")
         db.flush()
@@ -147,6 +168,7 @@ def finalize_video(
     enqueue_process_video(str(v.id), reason="finalize")
     index_video_metadata(v)
     return _video_to_detail(v)
+
 
 @router.get("/my", response_model=PaginatedVideos)
 def list_my_videos(
@@ -182,6 +204,7 @@ def list_my_videos(
         )
     next_offset = offset + len(items) if has_more else None
     return PaginatedVideos(items=out, next_offset=next_offset)
+
 
 @router.get("/{video_id}", response_model=PublicVideoDetail)
 def get_video(
@@ -239,7 +262,10 @@ def get_video(
     wh.last_watched_at = func.now()
     db.commit()
 
-    return _video_to_public_detail(v, resume_from_seconds=resume_from, progress_percent=progress_percent)
+    return _video_to_public_detail(
+        v, resume_from_seconds=resume_from, progress_percent=progress_percent
+    )
+
 
 @router.delete("/{video_id}", response_model=Ok)
 def delete_video(
