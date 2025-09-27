@@ -17,7 +17,7 @@ from cache import redis_client
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Very generous dev rate limit: 20/min per (ip,email)
+# dev rate limit: 20/min per (ip,email)
 LOGIN_LIMIT = 20
 LOGIN_WINDOW_SEC = 60
 
@@ -96,7 +96,7 @@ def login(
 
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(user.password_hash, body.password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     sid = create_session(str(user.id))
     set_session_cookie(response, sid)

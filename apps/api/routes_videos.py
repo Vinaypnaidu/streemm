@@ -144,7 +144,7 @@ def finalize_video(
             raise HTTPException(
                 status_code=409, detail="Video exists with different raw key"
             )
-        # Enqueue again is safe (idempotent from worker side later)
+        # Enqueue again is safe (idempotent from worker side)
         enqueue_process_video(str(existing.id), reason="finalize-idempotent")
         db.flush()
         db.refresh(existing)

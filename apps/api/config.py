@@ -62,20 +62,10 @@ class Settings:
         self.opensearch_username = os.getenv("OPENSEARCH_USERNAME", "admin")
         self.opensearch_password = os.getenv("OPENSEARCH_PASSWORD", "admin")
 
-        # Search thresholds
-        self.min_meta_coverage = float(os.getenv("MIN_META_COVERAGE", "0.0"))
-        self.min_transcript_coverage = float(
-            os.getenv("MIN_TRANSCRIPT_COVERAGE", "0.25")
-        )
-
         # Transcription / Whisper settings
         self.whisper_enabled = os.getenv("WHISPER_ENABLED", "true").lower() == "true"
         self.whisper_model = os.getenv("WHISPER_MODEL", "base.en")
         self.whisper_lang = os.getenv("WHISPER_LANG", "en")
-        self.whisper_use_openai_fallback = (
-            os.getenv("WHISPER_USE_OPENAI_FALLBACK", "true").lower() == "true"
-        )
-        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
         # Email / SMTP
         self.email_enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"

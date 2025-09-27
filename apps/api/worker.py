@@ -71,6 +71,7 @@ def _backoff_for_attempt(attempt: int) -> Optional[int]:
 
 
 def _lock_refresher(video_id: str, worker_id: str, stop: threading.Event):
+    # TODO: verify worker_id matches current worker
     interval = max(5, min(60, settings.worker_lock_ttl_ms // 3000))
     while not stop.is_set():
         time.sleep(interval)
@@ -298,29 +299,6 @@ def _transcribe_with_faster_whisper(audio_path: str, model_name: str, language: 
                 }
             )
         return out
-    except Exception:
-        return None
-
-
-def _transcribe_with_openai(audio_path: str, language: str):
-    try:
-        from openai import OpenAI
-    except Exception:
-        return None
-    api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return None
-    try:
-        client = OpenAI(api_key=api_key)
-        with open(audio_path, "rb") as f:
-            tr = client.audio.transcriptions.create(
-                model="whisper-1", file=f, language=language
-            )
-        # OpenAI returns text without timestamps; fall back to single segment
-        txt = (getattr(tr, "text", None) or "").strip()
-        if not txt:
-            return None
-        return [{"start": 0.0, "end": 0.0, "text": txt, "lang": language}]
     except Exception:
         return None
 
@@ -586,7 +564,7 @@ def process_video(video_id: str, reason: str) -> None:
                     )
                 )
 
-            # Transcription (optional)
+            # Transcription
             caption_key = build_caption_key(video_id, settings.whisper_lang)
             has_vtt, _ = object_exists(settings.s3_bucket, caption_key)
             if settings.whisper_enabled and not has_vtt:
@@ -615,11 +593,6 @@ def process_video(video_id: str, reason: str) -> None:
                     segments = _transcribe_with_faster_whisper(
                         audio_path, settings.whisper_model, settings.whisper_lang
                     )
-                    if segments is None and settings.whisper_use_openai_fallback:
-                        segments = _transcribe_with_openai(
-                            audio_path, settings.whisper_lang
-                        )
-
                     if segments:
                         # Write VTT
                         vtt_local = os.path.join(tmpd, "captions.vtt")
