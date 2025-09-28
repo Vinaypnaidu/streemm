@@ -185,7 +185,7 @@ def homefeed(
                     {
                         "multi_match": {
                             "query": query,
-                            "fields": ["title^2", "description"],
+                            "fields": ["title", "description"],
                             "type": "best_fields",
                         }
                     }
