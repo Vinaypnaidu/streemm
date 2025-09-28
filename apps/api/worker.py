@@ -264,7 +264,7 @@ def _write_vtt(segments, out_path: str) -> None:
         h = int(t // 3600)
         m = int((t % 3600) // 60)
         s = t % 60
-        return f"{h:02d}:{m:02d}:{s:06.3f}".replace(".", ",")
+        return f"{h:02d}:{m:02d}:{s:06.3f}"  
 
     lines = ["WEBVTT", ""]
     for i, seg in enumerate(segments, 1):
