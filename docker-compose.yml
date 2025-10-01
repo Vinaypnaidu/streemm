@@ -1,6 +1,6 @@
 services:
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-09-22T00-33-43Z
     container_name: streemm_minio
     command: server /data --console-address ":9001"
     environment:
@@ -77,7 +77,7 @@ services:
     restart: unless-stopped
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.20.4
     container_name: streemm_mailpit
     ports:
       - "1025:1025"    # SMTP
