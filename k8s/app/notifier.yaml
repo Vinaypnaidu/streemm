@@ -38,18 +38,18 @@ spec:
           mountPath: /app
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "200m"
-          limits:
             memory: "512Mi"
             cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
         startupProbe:
           httpGet:
             path: /ready
             port: 9200
           initialDelaySeconds: 60
           periodSeconds: 10
-          failureThreshold: 60
+          failureThreshold: 18 # 3 minute window
         livenessProbe:
           httpGet:
             path: /ready

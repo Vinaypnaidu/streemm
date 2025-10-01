@@ -52,7 +52,7 @@ spec:
             port: 3000
           initialDelaySeconds: 60
           periodSeconds: 10
-          failureThreshold: 30
+          failureThreshold: 12 # 2 minute window
         livenessProbe:
           httpGet:
             path: /
