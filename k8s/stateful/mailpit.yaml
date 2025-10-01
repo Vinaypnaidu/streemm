@@ -1,0 +1,65 @@
+# k8s/stateful/mailpit.yaml
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  namespace: streemm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailpit
+  template:
+    metadata:
+      labels:
+        app: mailpit
+    spec:
+      containers:
+      - name: mailpit
+        image: axllent/mailpit:latest
+        ports:
+        - containerPort: 1025
+          name: smtp
+        - containerPort: 8025
+          name: http
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+---
+# Service for SMTP (internal)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit-smtp
+  namespace: streemm
+spec:
+  selector:
+    app: mailpit
+  ports:
+  - port: 1025
+    targetPort: 1025
+    name: smtp
+
+---
+# NodePort service for web UI access
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit-web
+  namespace: streemm
+spec:
+  type: NodePort
+  selector:
+    app: mailpit
+  ports:
+  - port: 8025
+    targetPort: 8025
+    nodePort: 30004
+    name: http

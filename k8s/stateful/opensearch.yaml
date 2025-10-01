@@ -1,0 +1,102 @@
+# k8s/stateful/opensearch.yaml
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch
+  namespace: streemm
+spec:
+  serviceName: opensearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opensearch
+  template:
+    metadata:
+      labels:
+        app: opensearch
+    spec:
+      initContainers:
+      # Fix volume permissions for OpenSearch user (1000)
+      - name: fix-permissions
+        image: busybox
+        command:
+        - sh
+        - -c
+        - chown -R 1000:1000 /usr/share/opensearch/data
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/opensearch/data
+      containers:
+      - name: opensearch
+        image: opensearchproject/opensearch:2.13.0
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9600
+          name: diagnostics
+        env:
+        - name: discovery.type
+          value: "single-node"
+        - name: plugins.security.disabled
+          value: "true"
+        - name: OPENSEARCH_JAVA_OPTS
+          value: "-Xms512m -Xmx512m"
+        - name: bootstrap.memory_lock
+          value: "true"
+        - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+          value: "Vinay@Open5e@rch"
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/opensearch/data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 5
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+# Headless service for direct pod access
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch
+  namespace: streemm
+spec:
+  clusterIP: None
+  selector:
+    app: opensearch
+  ports:
+  - port: 9200
+    targetPort: 9200
+    name: http
+  - port: 9600
+    targetPort: 9600
+    name: diagnostics

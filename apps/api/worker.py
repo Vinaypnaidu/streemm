@@ -9,7 +9,7 @@ import tempfile
 import subprocess
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from cache import redis_client, healthcheck as cache_health
 from db import SessionLocal, healthcheck as db_health
 from models import Video, VideoAsset
@@ -747,7 +747,11 @@ def on_shutdown():
 
 
 @app.get("/ready")
-def ready():
+def ready(response: Response):
+    """
+    Kubernetes readiness/liveness probe.
+    Returns 200 if healthy, 503 if not.
+    """
     ok_db = True
     ok_cache = True
     try:
@@ -758,4 +762,11 @@ def ready():
         cache_health()
     except Exception:
         ok_cache = False
-    return {"ok": ok_db and ok_cache, "db": ok_db, "cache": ok_cache}
+    
+    is_ok = ok_db and ok_cache
+    
+    # Set HTTP status code for Kubernetes
+    if not is_ok:
+        response.status_code = 503
+    
+    return {"ok": is_ok, "db": ok_db, "cache": ok_cache}

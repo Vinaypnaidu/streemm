@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Callable, Iterable
 
-from fastapi import FastAPI, Depends, Query
+from fastapi import FastAPI, Depends, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
@@ -18,7 +18,7 @@ from routes_history import router as history_router
 from routes_search import router as search_router
 from routes_homefeed import router as homefeed_router
 from search import ensure_indexes, get_client, VIDEOS_INDEX, TRANSCRIPTS_INDEX
-from health import collect_health_status
+from health import collect_health_status, liveness_check, readiness_check
 
 
 app = FastAPI(title="Streemm API")
@@ -73,8 +73,43 @@ def root():
 
 
 @app.get("/healthz")
-def healthz(include_optional: bool = Query(True, description="Include optional checks")):
-    return collect_health_status(include_optional=include_optional)
+def healthz(response: Response, include_optional: bool = Query(True, description="Include optional checks")):
+    """
+    Detailed health check endpoint - returns all check results.
+    Sets HTTP status code based on overall health.
+    """
+    result = collect_health_status(include_optional=include_optional)
+    
+    # Set proper HTTP status code for Kubernetes
+    if not result.get("ok", False):
+        response.status_code = 503  # Service Unavailable
+    
+    return result
+
+
+@app.get("/healthz/live")
+def healthz_live(response: Response):
+    """
+    Kubernetes liveness probe - minimal check.
+    Returns 200 if app is alive, 503 if it should be restarted.
+    """
+    result = liveness_check()
+    # Liveness almost always succeeds unless app is completely broken
+    return result
+
+
+@app.get("/healthz/ready")
+def healthz_ready(response: Response):
+    """
+    Kubernetes readiness probe - checks if ready to serve traffic.
+    Returns 200 if ready, 503 if not ready.
+    """
+    result = readiness_check()
+    
+    if result.get("status") != "ready":
+        response.status_code = 503  # Service Unavailable
+    
+    return result
 
 
 @app.get("/search/debug")

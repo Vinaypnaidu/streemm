@@ -1,0 +1,52 @@
+# k8s/config/configmap.yaml
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: streemm-config
+  namespace: streemm
+data:
+  # Environment
+  ENV: development
+  PYTHONUNBUFFERED: "1"
+  
+  # Session settings
+  SESSION_COOKIE_NAME: sid
+  SESSION_TTL_SECONDS: "604800"
+  
+  # CORS settings
+  CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+  
+  # S3/MinIO settings
+  S3_ENDPOINT: http://minio:9000
+  S3_PUBLIC_ENDPOINT: http://localhost:9000
+  S3_REGION: us-east-1
+  S3_BUCKET: media
+  S3_USE_SSL: "false"
+  
+  # OpenSearch settings
+  OPENSEARCH_URL: http://opensearch:9200
+  
+  # FFmpeg/Worker settings
+  FFMPEG_BIN: ffmpeg
+  FFPROBE_BIN: ffprobe
+  FFMPEG_TIMEOUT_720P_SECONDS: "1200"
+  FFMPEG_TIMEOUT_480P_SECONDS: "900"
+  THUMBNAIL_TIMEOUT_SECONDS: "30"
+  FFPROBE_TIMEOUT_SECONDS: "30"
+  WORKER_LOCK_TTL_MS: "900000"
+  WORKER_BACKOFF_SECONDS: "30,120,300"
+  
+  # Email settings
+  EMAIL_ENABLED: "true"
+  EMAIL_FROM: dev@streemm.local
+  SMTP_HOST: mailpit-smtp
+  SMTP_PORT: "1025"
+  SMTP_STARTTLS: "false"
+  SMTP_SSL: "false"
+  PUBLIC_WEB_BASE_URL: http://localhost:3000
+  
+  # Next.js frontend settings
+  NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+  API_BASE_URL: http://api:8000

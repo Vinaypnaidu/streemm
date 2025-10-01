@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Callable, Optional, Tuple
+from typing import Any, Dict
+
+from fastapi import Response
 
 from cache import healthcheck as cache_healthcheck
 from config import settings
@@ -10,93 +12,131 @@ from db import healthcheck as db_healthcheck
 from search import get_client
 from storage import client as storage_client
 
-
 log = logging.getLogger("health")
 
 
-class HealthCheckSkipped(Exception):
-    """Raised when a health check is intentionally skipped."""
-
-    def __init__(self, reason: str):
-        super().__init__(reason)
-        self.reason = reason
-
-
-HealthCheck = Tuple[str, Callable[[], Optional[Dict[str, Any]]], bool]
-
-
-def _check_database() -> Optional[Dict[str, Any]]:
-    db_healthcheck()
-    return None
+def check_database() -> Dict[str, Any]:
+    """Check if database connection is working."""
+    try:
+        db_healthcheck()
+        return {"ok": True}
+    except Exception as e:
+        log.warning("Database health check failed: %s", e)
+        return {"ok": False, "error": str(e)}
 
 
-def _check_cache() -> Optional[Dict[str, Any]]:
-    cache_ok = cache_healthcheck()
-    if not cache_ok:
-        raise RuntimeError("Redis ping returned falsy response")
-    return None
+def check_cache() -> Dict[str, Any]:
+    """Check if Redis cache is working."""
+    try:
+        if not cache_healthcheck():
+            raise RuntimeError("Redis ping returned falsy response")
+        return {"ok": True}
+    except Exception as e:
+        log.warning("Cache health check failed: %s", e)
+        return {"ok": False, "error": str(e)}
 
 
-def _check_object_storage() -> Optional[Dict[str, Any]]:
+def check_object_storage() -> Dict[str, Any]:
+    """Check if S3/MinIO object storage is working."""
     bucket = settings.s3_bucket
     if not bucket:
-        raise HealthCheckSkipped("S3 bucket not configured")
+        return {"ok": True, "skipped": True, "reason": "S3 bucket not configured"}
+    
+    try:
+        client = storage_client()
+        if not client.bucket_exists(bucket):
+            raise RuntimeError(f"Bucket '{bucket}' does not exist")
+        return {"ok": True, "bucket": bucket}
+    except Exception as e:
+        log.warning("Object storage health check failed: %s", e)
+        return {"ok": False, "error": str(e)}
 
-    client = storage_client()
-    exists = client.bucket_exists(bucket)
-    if not exists:
-        raise RuntimeError(f"Bucket '{bucket}' does not exist")
-    return {"bucket": bucket}
 
-
-def _check_search() -> Optional[Dict[str, Any]]:
+def check_search(skip_if_disabled: bool = False) -> Dict[str, Any]:
+    """Check if OpenSearch is working (optional service)."""
     url = (settings.opensearch_url or "").strip()
     if not url:
-        raise HealthCheckSkipped("OpenSearch URL not configured")
-
-    client = get_client()
-    if not client:
-        raise RuntimeError("OpenSearch client unavailable")
-
-    if not client.ping():
-        raise RuntimeError("OpenSearch ping failed")
-
-    cluster = client.cluster.health()
-    status = cluster.get("status") if isinstance(cluster, dict) else None
-    return {"status": status or "unknown"}
-
-
-CHECKS: Tuple[HealthCheck, ...] = (
-    ("database", _check_database, False),
-    ("cache", _check_cache, False),
-    ("object_storage", _check_object_storage, False),
-    ("search", _check_search, True),
-)
+        return {"ok": True, "skipped": True, "reason": "OpenSearch URL not configured"}
+    
+    if skip_if_disabled:
+        return {"ok": True, "skipped": True, "reason": "optional check skipped"}
+    
+    try:
+        client = get_client()
+        if not client:
+            raise RuntimeError("OpenSearch client unavailable")
+        
+        if not client.ping():
+            raise RuntimeError("OpenSearch ping failed")
+        
+        cluster = client.cluster.health()
+        status = cluster.get("status") if isinstance(cluster, dict) else "unknown"
+        return {"ok": True, "status": status}
+    except Exception as e:
+        log.warning("Search health check failed: %s", e)
+        return {"ok": True, "error": str(e), "optional": True}
 
 
 def collect_health_status(include_optional: bool = True) -> Dict[str, Any]:
-    checks: Dict[str, Dict[str, Any]] = {}
-    overall_ok = True
+    """
+    Run all health checks and return overall status.
+    
+    Required services: database, cache, object_storage
+    Optional services: search (OpenSearch)
+    
+    Returns overall "ok": True only if all required services are healthy.
+    """
+    # Run required checks
+    database = check_database()
+    cache = check_cache()
+    storage = check_object_storage()
+    
+    # Run optional checks
+    search = check_search(skip_if_disabled=not include_optional)
+    
+    # Determine overall health - only required services affect this
+    overall_ok = all([
+        database.get("ok", False),
+        cache.get("ok", False),
+        storage.get("ok", False),
+    ])
+    
+    return {
+        "ok": overall_ok,
+        "checks": {
+            "database": database,
+            "cache": cache,
+            "object_storage": storage,
+            "search": search,
+        }
+    }
 
-    for name, func, optional in CHECKS:
-        if optional and not include_optional:
-            checks[name] = {
-                "ok": True,
-                "skipped": True,
-                "reason": "optional check skipped",
-            }
-            continue
 
-        try:
-            details = func() or {}
-            checks[name] = {"ok": True, **details}
-        except HealthCheckSkipped as skipped:
-            checks[name] = {"ok": True, "skipped": True, "reason": skipped.reason}
-        except Exception as exc:
-            checks[name] = {"ok": False, "error": str(exc)}
-            if not optional:
-                overall_ok = False
-            log.warning("Health check '%s' failed: %s", name, exc)
+def liveness_check() -> Dict[str, Any]:
+    """
+    Kubernetes liveness probe - checks if app is alive.
+    Should only fail if app needs to be restarted.
+    """
+    # For API: just check if the app is running (always True unless crashed)
+    return {"status": "alive"}
 
-    return {"ok": overall_ok, "checks": checks}
 
+def readiness_check() -> Dict[str, Any]:
+    """
+    Kubernetes readiness probe - checks if app is ready to serve traffic.
+    Should check critical dependencies (DB, Redis).
+    """
+    # Check only critical services for readiness
+    database = check_database()
+    cache = check_cache()
+    
+    is_ready = database.get("ok", False) and cache.get("ok", False)
+    
+    if not is_ready:
+        return {
+            "status": "not_ready",
+            "database": database,
+            "cache": cache,
+        }
+    
+    return {"status": "ready"}
