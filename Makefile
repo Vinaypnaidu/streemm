@@ -1,33 +1,52 @@
-# Makefile for Streemm Kubernetes operations
+# Makefile for easy k8s operations
 
-.PHONY: help cluster deploy destroy clean
+.PHONY: help cluster deploy deploy-with-autoscaling install-keda destroy clean
 
 # Default target
 help:
 	@echo "Streemm Kubernetes Commands"
 	@echo ""
 	@echo "Cluster Management:"
-	@echo "  make cluster        Create kind cluster"
-	@echo "  make clean          Delete kind cluster"
+	@echo "  make cluster                  Create kind cluster"
+	@echo "  make clean                    Delete kind cluster"
 	@echo ""
 	@echo "Deployment:"
-	@echo "  make deploy         Deploy all resources"
-	@echo "  make destroy        Delete all resources"
+	@echo "  make deploy                   Deploy all resources (standard)"
+	@echo "  make deploy-with-autoscaling  Deploy with KEDA worker autoscaling"
+	@echo "  make destroy                  Delete all resources"
+	@echo ""
+	@echo "KEDA Autoscaling:"
+	@echo "  make install-keda             Install KEDA for autoscaling"
+	@echo "  make monitor-autoscaling      Monitor worker autoscaling"
 	@echo ""
 	@echo "Development:"
-	@echo "  make restart        Restart a service (use SERVICE=api)"
+	@echo "  make restart                  Restart a service (use SERVICE=api)"
+	@echo "  make watch                    Watch all pods"
 	@echo ""
 	@echo "Quick Start:"
 	@echo "  make cluster && make deploy"
+	@echo "  make cluster && make install-keda && make deploy-with-autoscaling"
 	@echo ""
 
 # Create kind cluster
 cluster:
 	@./k8s/scripts/create-cluster.sh
 
-# Deploy all resources
+# Deploy all resources (standard)
 deploy:
 	@./k8s/scripts/deploy-all.sh
+
+# Deploy with KEDA autoscaling
+deploy-with-autoscaling:
+	@./k8s/scripts/deploy-with-autoscaling.sh
+
+# Install KEDA
+install-keda:
+	@./k8s/scripts/install-keda.sh
+
+# Monitor autoscaling
+monitor-autoscaling:
+	@./k8s/scripts/monitor-autoscaling.sh
 
 # Delete all resources (keep cluster)
 destroy:
@@ -54,7 +73,14 @@ quickstart: cluster deploy
 	@echo ""
 	@echo "Quickstart complete!"
 	@echo ""
-	@echo "Run 'make status' to check deployment progress"
+	@echo "Run 'make watch' to check deployment progress"
+
+# Quick start with autoscaling
+quickstart-autoscaling: cluster install-keda deploy-with-autoscaling
+	@echo ""
+	@echo "Quickstart with autoscaling complete!"
+	@echo ""
+	@echo "Run 'make monitor-autoscaling' to watch autoscaling behavior"
 
 # Watch pods
 watch:

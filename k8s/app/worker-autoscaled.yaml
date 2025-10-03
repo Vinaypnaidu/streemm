@@ -1,4 +1,5 @@
-# k8s/app/worker.yaml
+# k8s/app/worker-autoscaled.yaml
+# Worker deployment with KEDA autoscaling based on Redis queue length
 
 ---
 apiVersion: apps/v1
@@ -7,7 +8,6 @@ metadata:
   name: worker
   namespace: streemm
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: worker
@@ -102,3 +102,33 @@ spec:
     targetPort: 9100
     nodePort: 30005
     name: http
+
+---
+# KEDA ScaledObject - Autoscale worker based on Redis queue length
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-scaler
+  namespace: streemm
+spec:
+  # Reference to the Deployment
+  scaleTargetRef:
+    name: worker
+    kind: Deployment
+  
+  minReplicaCount: 1 # 1 worker min (for dev)
+  maxReplicaCount: 2 # 2 workers max (for dev)
+  
+  cooldownPeriod: 180
+  pollingInterval: 30        
+  
+  triggers:
+  - type: redis
+    metadata:
+      address: redis.streemm.svc.cluster.local:6379 
+      databaseIndex: "0"                            
+      
+      listName: q:videos                            
+      listLength: "3" # Target: 3 jobs per pod                        
+      
+      activationListLength: "1"

@@ -18,10 +18,6 @@ nodes:
       - containerPort: 30001
         hostPort: 8000
         protocol: TCP
-      # MinIO S3 API
-      - containerPort: 30002
-        hostPort: 9000
-        protocol: TCP
       # MinIO Console
       - containerPort: 30003
         hostPort: 9001
@@ -29,12 +25,4 @@ nodes:
       # Mailpit UI
       - containerPort: 30004
         hostPort: 8025
-        protocol: TCP
-      # Worker
-      - containerPort: 30005
-        hostPort: 9100
-        protocol: TCP
-      # Notifier
-      - containerPort: 30006
-        hostPort: 9200
         protocol: TCP
