@@ -8,8 +8,8 @@ services:
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
       MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:3000,http://127.0.0.1:3000
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web console
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - minio_data:/data
       - minio_config:/root/.minio
@@ -23,7 +23,7 @@ services:
       POSTGRES_PASSWORD: streemm
       POSTGRES_DB: streemm_dev
     ports:
-      - "5432:5432" # optional: for local psql tools
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -38,7 +38,7 @@ services:
     container_name: streemm_redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379" # optional: for local redis-cli
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -65,8 +65,8 @@ services:
         soft: 65536
         hard: 65536
     ports:
-      - "9600:9600"   # diagnostics port
-      - "9201:9200"   # REST API (host:container)
+      - "9600:9600"
+      - "9201:9200"
     volumes:
       - opensearch_data:/usr/share/opensearch/data
     healthcheck:
@@ -80,8 +80,8 @@ services:
     image: axllent/mailpit:v1.20.4
     container_name: streemm_mailpit
     ports:
-      - "1025:1025"    # SMTP
-      - "8025:8025"    # Web UI
+      - "1025:1025"
+      - "8025:8025"
     restart: unless-stopped
 
   api:
@@ -94,18 +94,14 @@ services:
     volumes:
       - ./apps/api:/app
     environment:
-      # Container networking URLs
       DATABASE_URL: postgresql+psycopg://streemm:streemm@db:5432/streemm_dev
       REDIS_URL: redis://redis:6379/0
-      # App settings
       ENV: development
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       SESSION_COOKIE_NAME: sid
       SESSION_TTL_SECONDS: 604800
-      # Secret (prefer from .env.compose)
       SESSION_SECRET: ${SESSION_SECRET:-changeme}
       PYTHONUNBUFFERED: "1"
-      # Object storage (only used when running API in Compose)
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
@@ -113,7 +109,6 @@ services:
       S3_REGION: us-east-1
       S3_BUCKET: media
       S3_USE_SSL: "false"
-      # OpenSearch
       OPENSEARCH_URL: http://opensearch:9200
       OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-opensearchadmin}
       OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-Vinay@Open5e@rch}
@@ -152,7 +147,6 @@ services:
       S3_REGION: us-east-1
       S3_BUCKET: media
       S3_USE_SSL: "false"
-      # Worker/FFmpeg envs (defaults fine)
       FFMPEG_BIN: ffmpeg
       FFPROBE_BIN: ffprobe
       FFMPEG_TIMEOUT_720P_SECONDS: 1200
@@ -161,7 +155,6 @@ services:
       FFPROBE_TIMEOUT_SECONDS: 30
       WORKER_LOCK_TTL_MS: 900000
       WORKER_BACKOFF_SECONDS: 30,120,300
-      # OpenSearch
       OPENSEARCH_URL: http://opensearch:9200
       OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-opensearchadmin}
       OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-Vinay@Open5e@rch}
@@ -195,7 +188,6 @@ services:
       SESSION_TTL_SECONDS: 604800
       SESSION_SECRET: ${SESSION_SECRET:-changeme}
       PYTHONUNBUFFERED: "1"
-      # Email
       EMAIL_ENABLED: "true"
       EMAIL_FROM: dev@streemm.local
       SMTP_HOST: mailpit

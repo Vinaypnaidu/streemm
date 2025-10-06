@@ -523,6 +523,23 @@ Helpers exist to build keys and to verify object existence:
 - `GET /healthz?include_optional=true`:
   - Runs checks for database, cache (Redis), object storage bucket, and optionally OpenSearch.
   - Response: `{ ok, checks: { database, cache, object_storage, search } }` with per-check details and skip flags.
+  - Sets HTTP status code 503 if overall health fails (required services only).
+  - Overall `ok` is true only if all required services (database, cache, object_storage) are healthy.
+  - OpenSearch is optional and does not affect overall `ok` status.
+- `GET /healthz/live`:
+  - Kubernetes liveness probe - minimal check to verify app is alive.
+  - Always returns `{ status: "alive" }` unless the app has completely crashed.
+  - Returns 200 status code.
+- `GET /healthz/ready`:
+  - Kubernetes readiness probe - checks if app is ready to serve traffic.
+  - Checks critical services: database and cache.
+  - Returns `{ status: "ready" }` with 200 if ready, or `{ status: "not_ready", database, cache }` with 503 if not ready.
 - `GET /search/debug`:
   - Returns OpenSearch cluster health, index list, and basic index stats for `videos` and `transcript_chunks`.
   - Response: `{ ok, cluster, indices, stats }` or `{ ok: false, error }` if unavailable.
+
+### Worker & Notifier health
+- Both worker and notifier services expose `GET /ready`:
+  - Checks database and cache connectivity.
+  - Returns `{ ok, db, cache }` with 200 if healthy, 503 if not.
+  - Used for Kubernetes liveness and readiness probes.
