@@ -18,6 +18,10 @@ nodes:
       - containerPort: 30001
         hostPort: 8000
         protocol: TCP
+      # MinIO S3 API
+      - containerPort: 30002
+        hostPort: 9000
+        protocol: TCP
       # MinIO Console
       - containerPort: 30003
         hostPort: 9001
