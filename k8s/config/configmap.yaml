@@ -4,8 +4,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: streemm-config
-  namespace: streemm
+  name: streem-config
+  namespace: streem
 data:
   # Environment
   ENV: development
@@ -40,7 +40,7 @@ data:
   
   # Email settings
   EMAIL_ENABLED: "true"
-  EMAIL_FROM: dev@streemm.local
+  EMAIL_FROM: dev@streem.local
   SMTP_HOST: mailpit-smtp
   SMTP_PORT: "1025"
   SMTP_STARTTLS: "false"

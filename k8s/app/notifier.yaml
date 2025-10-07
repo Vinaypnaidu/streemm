@@ -5,7 +5,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: notifier
-  namespace: streemm
+  namespace: streem
 spec:
   replicas: 1
   selector:
@@ -30,9 +30,9 @@ spec:
           name: http
         envFrom:
         - secretRef:
-            name: streemm-secrets
+            name: streem-secrets
         - configMapRef:
-            name: streemm-config
+            name: streem-config
         volumeMounts:
         - name: notifier-code
           mountPath: /app
@@ -67,7 +67,7 @@ spec:
       volumes:
       - name: notifier-code
         hostPath:
-          path: /streemm/apps/api
+          path: /streem/apps/api
           type: Directory
 
 ---
@@ -76,7 +76,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: notifier
-  namespace: streemm
+  namespace: streem
 spec:
   selector:
     app: notifier
@@ -91,7 +91,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: notifier-external
-  namespace: streemm
+  namespace: streem
 spec:
   type: NodePort
   selector:

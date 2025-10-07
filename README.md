@@ -1,4 +1,4 @@
-# Streemm
+# Streem
 
 A cloud-native, autoscaling video platform for upload, transcoding, search, and playback. It supports:
 
@@ -114,7 +114,7 @@ make cluster && make deploy
 make watch
 
 # Or use k9s for interactive UI
-k9s -n streemm
+k9s -n streem
 ```
 
 #### Option 2: With KEDA Autoscaling
@@ -127,7 +127,7 @@ make cluster && make install-keda && make deploy-with-autoscaling
 make monitor-autoscaling
 
 # Or use k9s for interactive UI
-k9s -n streemm
+k9s -n streem
 ```
 
 #### Available Make Commands
@@ -155,15 +155,15 @@ If you prefer manual control or want to understand the deployment process:
 kind create cluster --config k8s/kind/cluster-config.yaml
 
 # Verify cluster
-kubectl cluster-info --context kind-streemm
+kubectl cluster-info --context kind-streem
 kubectl get nodes
 ```
 
 #### Step 2: Create Namespace
 ```bash
 # Create namespace and set as default
-kubectl create namespace streemm
-kubectl config set-context --current --namespace=streemm
+kubectl create namespace streem
+kubectl config set-context --current --namespace=streem
 ```
 
 #### Step 3: Deploy Infrastructure
@@ -176,7 +176,7 @@ kubectl apply -f k8s/stateful/opensearch.yaml
 kubectl apply -f k8s/stateful/mailpit.yaml
 
 # Wait for stateful services to be ready
-kubectl get pods -n streemm -w
+kubectl get pods -n streem -w
 # Press Ctrl+C when all pods show READY 1/1
 ```
 
@@ -196,13 +196,13 @@ kubectl apply -f k8s/app/notifier.yaml
 kubectl apply -f k8s/app/web.yaml
 
 # Watch all pods come up (takes 5-10 minutes for first startup)
-kubectl get pods -n streemm -w
+kubectl get pods -n streem -w
 
 # Or use k9s for interactive UI
-k9s -n streemm
+k9s -n streem
 
 # Or tail logs from all pods in namespace
-stern . -n streemm
+stern . -n streem
 ```
 
 ### KEDA Autoscaling Setup
@@ -233,10 +233,10 @@ kubectl apply -f k8s/app/worker-autoscaled.yaml  # Use autoscaled version
 make monitor-autoscaling
 
 # Or use k9s for interactive UI
-k9s -n streemm
+k9s -n streem
 
 # Or tail logs from all pods in namespace
-stern . -n streemm
+stern . -n streem
 ```
 
 ### Access URLs
@@ -253,8 +253,8 @@ Once deployed, access the services:
 #### Using k9s (Interactive Terminal UI)
 
 ```bash
-# Launch k9s for the streemm namespace
-k9s -n streemm
+# Launch k9s for the streem namespace
+k9s -n streem
 
 # Useful k9s shortcuts:
 # :pods     - View pods
@@ -271,15 +271,15 @@ k9s -n streemm
 
 ```bash
 # Tail logs from all pods in namespace
-stern . -n streemm
+stern . -n streem
 
 # Tail logs from specific service
-stern api -n streemm
-stern worker -n streemm
-stern notifier -n streemm
+stern api -n streem
+stern worker -n streem
+stern notifier -n streem
 
 # Filter by label
-stern -l app=worker -n streemm
+stern -l app=worker -n streem
 ```
 
 ### Teardown
@@ -295,5 +295,5 @@ kubectl delete -f k8s/config/
 kubectl delete -f k8s/stateful/
 
 # Delete cluster
-kind delete cluster --name streemm
+kind delete cluster --name streem
 ```

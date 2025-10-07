@@ -4,7 +4,7 @@
 
 set -e  # Exit on error
 
-CLUSTER_NAME="streemm"
+CLUSTER_NAME="streem"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K8S_DIR="$(dirname "$SCRIPT_DIR")"
 
@@ -49,5 +49,5 @@ echo ""
 
 echo "Next steps:"
 echo "   1. Deploy all resources: ./k8s/scripts/deploy-all.sh"
-echo "   2. Watch deployment:     kubectl get pods -n streemm -w"
+echo "   2. Watch deployment:     kubectl get pods -n streem -w"
 echo "   3. View logs:            ./k8s/scripts/logs.sh <service-name>"

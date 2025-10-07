@@ -28,7 +28,7 @@ from search import index_video_metadata
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("worker")
 
-app = FastAPI(title="Streemm Worker")
+app = FastAPI(title="Streem Worker")
 
 _stop_event = threading.Event()
 

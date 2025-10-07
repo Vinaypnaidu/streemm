@@ -4,7 +4,7 @@
 
 # Default target
 help:
-	@echo "Streemm Kubernetes Commands"
+	@echo "Streem Kubernetes Commands"
 	@echo ""
 	@echo "Cluster Management:"
 	@echo "  make cluster                  Create kind cluster"
@@ -59,13 +59,13 @@ restart:
 		exit 1; \
 	fi
 	@echo "Restarting $(SERVICE)..."
-	@kubectl rollout restart deployment/$(SERVICE) -n streemm
+	@kubectl rollout restart deployment/$(SERVICE) -n streem
 	@echo "$(SERVICE) restarted"
 
 # Delete cluster completely
 clean:
-	@echo "Deleting kind cluster: streemm"
-	@kind delete cluster --name streemm
+	@echo "Deleting kind cluster: streem"
+	@kind delete cluster --name streem
 	@echo "Cluster deleted"
 
 # Quick start (create cluster + deploy)
@@ -84,4 +84,4 @@ quickstart-autoscaling: cluster install-keda deploy-with-autoscaling
 
 # Watch pods
 watch:
-	@kubectl get pods -n streemm -w
+	@kubectl get pods -n streem -w

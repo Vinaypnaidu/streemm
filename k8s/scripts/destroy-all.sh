@@ -4,9 +4,9 @@
 
 set -e  # Exit on error
 
-NAMESPACE="streemm"
+NAMESPACE="streem"
 
-echo "Destroying Streemm Kubernetes resources..."
+echo "Destroying Streem Kubernetes resources..."
 echo ""
 
 # Check if kubectl is available
@@ -38,4 +38,4 @@ echo ""
 echo "Cleanup complete!"
 echo ""
 echo "To delete the entire cluster:"
-echo "   kind delete cluster --name streemm"
+echo "   kind delete cluster --name streem"

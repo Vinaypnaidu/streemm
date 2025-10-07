@@ -10,7 +10,7 @@ class Settings:
         self.env = os.getenv("ENV", "development")
         self.database_url = os.getenv(
             "DATABASE_URL",
-            "postgresql+psycopg://streemm:streemm@localhost:5432/streemm_dev",
+            "postgresql+psycopg://streem:streem@localhost:5432/streem_dev",
         )
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.session_secret = os.getenv("SESSION_SECRET", "changeme")
@@ -69,7 +69,7 @@ class Settings:
 
         # Email / SMTP
         self.email_enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
-        self.email_from = os.getenv("EMAIL_FROM", "no-reply@streemm.local")
+        self.email_from = os.getenv("EMAIL_FROM", "no-reply@streem.local")
         self.smtp_host = os.getenv("SMTP_HOST", "localhost")
         self.smtp_port = int(os.getenv("SMTP_PORT", "1025"))
         self.smtp_username = os.getenv("SMTP_USERNAME", "")

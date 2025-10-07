@@ -2,7 +2,7 @@
 # k8s/scripts/monitor-autoscaling.sh
 # Monitor KEDA autoscaling behavior in real-time
 
-NAMESPACE="streemm"
+NAMESPACE="streem"
 
 echo "════════════════════════════════════════════════════════════"
 echo "KEDA Worker Autoscaling Monitor"

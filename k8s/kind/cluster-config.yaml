@@ -2,13 +2,13 @@
 
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: streemm
+name: streem
 nodes:
   - role: control-plane
     extraMounts:
       # Mount workspace for hot-reload during development
-      - hostPath: /Users/vinaypurushotham/Desktop/summer/streemm
-        containerPath: /streemm
+      - hostPath: /Users/vinaypurushotham/Desktop/summer/streem
+        containerPath: /streem
     extraPortMappings:
       # Web frontend
       - containerPort: 30000

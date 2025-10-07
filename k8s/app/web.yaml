@@ -5,7 +5,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  namespace: streemm
+  namespace: streem
 spec:
   replicas: 1
   selector:
@@ -31,7 +31,7 @@ spec:
           name: http
         envFrom:
         - configMapRef:
-            name: streemm-config
+            name: streem-config
         volumeMounts:
         - name: web-code
           mountPath: /app
@@ -70,7 +70,7 @@ spec:
       volumes:
       - name: web-code
         hostPath:
-          path: /streemm/apps/web
+          path: /streem/apps/web
           type: Directory
       - name: node-modules
         emptyDir: {}
@@ -83,7 +83,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web
-  namespace: streemm
+  namespace: streem
 spec:
   selector:
     app: web
@@ -98,7 +98,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web-external
-  namespace: streemm
+  namespace: streem
 spec:
   type: NodePort
   selector:

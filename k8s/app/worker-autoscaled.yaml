@@ -6,7 +6,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: worker
-  namespace: streemm
+  namespace: streem
 spec:
   selector:
     matchLabels:
@@ -31,9 +31,9 @@ spec:
           name: http
         envFrom:
         - secretRef:
-            name: streemm-secrets
+            name: streem-secrets
         - configMapRef:
-            name: streemm-config
+            name: streem-config
         volumeMounts:
         - name: worker-code
           mountPath: /app
@@ -68,7 +68,7 @@ spec:
       volumes:
       - name: worker-code
         hostPath:
-          path: /streemm/apps/api
+          path: /streem/apps/api
           type: Directory
 
 ---
@@ -77,7 +77,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: worker
-  namespace: streemm
+  namespace: streem
 spec:
   selector:
     app: worker
@@ -92,7 +92,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: worker-external
-  namespace: streemm
+  namespace: streem
 spec:
   type: NodePort
   selector:
@@ -109,7 +109,7 @@ apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: worker-scaler
-  namespace: streemm
+  namespace: streem
 spec:
   # Reference to the Deployment
   scaleTargetRef:
@@ -125,7 +125,7 @@ spec:
   triggers:
   - type: redis
     metadata:
-      address: redis.streemm.svc.cluster.local:6379 
+      address: redis.streem.svc.cluster.local:6379 
       databaseIndex: "0"                            
       
       listName: q:videos                            

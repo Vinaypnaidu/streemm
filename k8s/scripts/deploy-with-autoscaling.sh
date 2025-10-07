@@ -4,11 +4,11 @@
 
 set -e  # Exit on error
 
-NAMESPACE="streemm"
+NAMESPACE="streem"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K8S_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "Deploying Streemm with KEDA Autoscaling..."
+echo "Deploying Streem with KEDA Autoscaling..."
 echo ""
 
 # Check if kubectl is available

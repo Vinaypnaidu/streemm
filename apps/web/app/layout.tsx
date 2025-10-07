@@ -4,7 +4,7 @@ import Navbar from "./components/Navbar";
 import { AuthProvider } from "./providers";
 import AuthGate from "./components/AuthGate";
 
-export const metadata = { title: "Streemm" };
+export const metadata = { title: "Streem" };
 
 export default function RootLayout({
   children,

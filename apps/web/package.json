@@ -1,5 +1,5 @@
 {
-  "name": "@streemm/web",
+  "name": "@streem/web",
   "private": true,
   "type": "module",
   "scripts": {

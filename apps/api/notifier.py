@@ -19,7 +19,7 @@ from mailer import send_email
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("notifier")
 
-app = FastAPI(title="Streemm Notifier")
+app = FastAPI(title="Streem Notifier")
 _stop_event = threading.Event()
 
 
@@ -96,7 +96,7 @@ def notify_video_ready(video_id: str, reason: str) -> None:
             ).strip() or "your video"
             link = f"{settings.public_web_base_url}/videos/{video_id}"
             subject = f"Your video “{title}” is ready"
-            text = f'Hi,\n\nYour video "{title}" is ready to watch.\n\nOpen: {link}\n\n— Streemm'
+            text = f'Hi,\n\nYour video "{title}" is ready to watch.\n\nOpen: {link}\n\n— Streem'
 
             send_email(u.email, subject, text)
 

@@ -56,7 +56,7 @@ export default function Navbar() {
               className="flex items-center gap-1 text-xl font-semibold tracking-tight hover:opacity-80 transition"
             >
               <span className="inline-block w-3 h-3 rounded-sm bg-violet-600 mr-1" />
-              Streemm
+              Streem
             </Link>
           </div>
 

@@ -21,7 +21,7 @@ from search import ensure_indexes, get_client, VIDEOS_INDEX, TRANSCRIPTS_INDEX
 from health import collect_health_status, liveness_check, readiness_check
 
 
-app = FastAPI(title="Streemm API")
+app = FastAPI(title="Streem API")
 
 log = logging.getLogger("api.main")
 

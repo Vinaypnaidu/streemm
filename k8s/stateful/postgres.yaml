@@ -5,7 +5,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
-  namespace: streemm
+  namespace: streem
 spec:
   serviceName: postgres
   replicas: 1
@@ -25,11 +25,11 @@ spec:
           name: postgres
         env:
         - name: POSTGRES_USER
-          value: "streemm"
+          value: "streem"
         - name: POSTGRES_PASSWORD
-          value: "streemm"
+          value: "streem"
         - name: POSTGRES_DB
-          value: "streemm_dev"
+          value: "streem_dev"
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
         volumeMounts:
@@ -47,9 +47,9 @@ spec:
             command:
             - pg_isready
             - -U
-            - streemm
+            - streem
             - -d
-            - streemm_dev
+            - streem_dev
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
@@ -58,9 +58,9 @@ spec:
             command:
             - pg_isready
             - -U
-            - streemm
+            - streem
             - -d
-            - streemm_dev
+            - streem_dev
           initialDelaySeconds: 5
           periodSeconds: 5
           timeoutSeconds: 3
@@ -81,7 +81,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
-  namespace: streemm
+  namespace: streem
 spec:
   clusterIP: None
   selector:

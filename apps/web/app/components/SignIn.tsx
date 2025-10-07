@@ -50,7 +50,7 @@ export default function SignIn() {
         <header className="text-center mb-6">
           <div className="flex items-center justify-center gap-2">
             <span className="inline-block w-4 h-4 rounded-sm bg-violet-600" />
-            <h1 className="text-6xl font-semibold tracking-tight">Streemm</h1>
+            <h1 className="text-6xl font-semibold tracking-tight">Streem</h1>
           </div>
         </header>
 
