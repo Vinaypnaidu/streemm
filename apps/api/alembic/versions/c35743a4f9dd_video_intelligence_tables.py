@@ -1,18 +1,18 @@
 """video intelligence tables
 
-Revision ID: 14366d6acf59
+Revision ID: c35743a4f9dd
 Revises: 6b5b3b8e03a4
-Create Date: 2025-10-11 01:49:03.883897
+Create Date: 2025-10-11 22:56:36.132882
 
 """
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
-revision: str = '14366d6acf59'
+revision: str = 'c35743a4f9dd'
 down_revision: Union[str, Sequence[str], None] = '6b5b3b8e03a4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -34,12 +34,6 @@ def upgrade() -> None:
     sa.Column('canonical_name', sa.String(), nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_topics')),
     sa.UniqueConstraint('canonical_name', name=op.f('uq_topics_canonical_name'))
-    )
-    op.create_table('video_chapters',
-    sa.Column('video_id', sa.UUID(), nullable=False),
-    sa.Column('chapters', postgresql.ARRAY(sa.Text()), nullable=True),
-    sa.ForeignKeyConstraint(['video_id'], ['videos.id'], name=op.f('fk_video_chapters_video_id_videos'), ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('video_id', name=op.f('pk_video_chapters'))
     )
     op.create_table('video_entities',
     sa.Column('video_id', sa.UUID(), nullable=False),
@@ -90,7 +84,6 @@ def downgrade() -> None:
     op.drop_table('video_summary')
     op.drop_index('ix_video_entities_entity_video', table_name='video_entities')
     op.drop_table('video_entities')
-    op.drop_table('video_chapters')
     op.drop_table('topics')
     op.drop_table('entities')
     # ### end Alembic commands ###

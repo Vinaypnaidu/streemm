@@ -18,11 +18,6 @@
 
 *Note:* `category` is **index-only** (LLM-generated) → embedding + OpenSearch only.
 
-**Chapters —** ultra-light, ordered outline of the video’s flow (one-liners; no timestamps). Stored per video as an array (embedding-only; not indexed in OS).
-
-```json
-{ "chapters": ["string", "string", "string"] }
-```
 
 **Tags —** searchable labels derived from topics/entities/attributes; user-facing indexing sugar. `weight` is confidence/usefulness.
 
@@ -34,7 +29,7 @@
 
 ```json
 {
-  "content_type": "tutorial|review|interview|vlog|documentary|news|discussion|educational|presentation|entertainment|sports|other",
+  "content_type": "entertainment|educational|review|interview|news|lifestyle|other",
   "duration_s": 0.0,
   "language": "en"
 }
@@ -63,11 +58,6 @@ Description: {source description}
 
 Summary: {short_summary}
 
-Chapters:
-- {chapter 1}
-- {chapter 2}
-- {chapter 3}
-
 Topics: {topic1} | {topic2} | {topic3}           // may include category inline, e.g., "Pasta making [cooking_food]"
 Entities: {name1 (person)} | {name2 (product)}   // include entity type inline
 
@@ -84,7 +74,6 @@ Metadata: content_type={tutorial|...}, language={en}
 
 * **videos**: `id PK`, `title`, `description`, `duration_s`, `language`, `content_type`, …(existing cols)
 * **video_summary**: `video_id PK/FK`, `short_summary TEXT`
-* **video_chapters**: `video_id PK/FK`, `chapters TEXT[]`  ← one row per video (embedding-only)
 * **topics**: `id PK`, `name`, `canonical_name UNIQUE`
 * **video_topics**: `video_id FK`, `topic_id FK`, `prominence NUMERIC(3,2)`, `UNIQUE(video_id, topic_id)`
 * **entities**: `id PK`, `name`, `canonical_name UNIQUE`
@@ -98,12 +87,12 @@ Metadata: content_type={tutorial|...}, language={en}
 * `video_topics(video_id, topic_id)` **UNIQUE** and `video_topics(topic_id, video_id)` (btree)
 * `video_entities(video_id, entity_id)` **UNIQUE** and `video_entities(entity_id, video_id)` (btree)
 * `video_tags(video_id, tag)` **UNIQUE** and `video_tags(tag)` (btree)
-* *(No index needed on `video_chapters` beyond the PK; reads are by `video_id`.)*
+
 * Optional: `video_topics(topic_id, prominence)`, `video_entities(entity_id, importance)`, `videos(content_type)`, `videos(language)`, and case-insensitive tags via `CITEXT` or `UNIQUE (video_id, lower(tag))`
 
 ### 3.2 OpenSearch (per-video doc; denormalized; kNN enabled)
 
-(Include index-only fields + vector; **do not index summary or chapters**.)
+(Include index-only fields + vector; **do not index summary**.)
 
 ```json
 {
@@ -128,7 +117,7 @@ Metadata: content_type={tutorial|...}, language={en}
 ```
 
 *Mapping hints:* text fields with `keyword` subfields for aggs; `entities`/`topics` as `nested`; `embedding` as `knn_vector`.
-*BM25 fields (no summary/chapters):* `title^4`, `topics.name^3`, `entities.name^3`, `description^2`, `tags^1`.
+*BM25 fields (no summary):* `title^4`, `topics.name^3`, `entities.name^3`, `description^2`, `tags^1`.
 
 ### 3.3 Neo4j Graph Layer (bipartite, lean)
 
@@ -156,18 +145,18 @@ Metadata: content_type={tutorial|...}, language={en}
 
 ## 4) Extraction & Indexing Flow
 
-1. **Extract (LLM/agents):** entities (**plus index-only `type`**), topics (**plus index-only `category`**), chapters (one-liners), tags, short_summary, metadata.
+1. **Extract (LLM/agents):** entities (**plus index-only `type`**), topics (**plus index-only `category`**), tags, short_summary, metadata.
 2. **Persist to Postgres (upserts):**
-   `video_summary.short_summary`; `video_chapters.chapters` (array);
+   `video_summary.short_summary`;
    `topics` + `video_topics(prominence)` *(no `category`)*;
    `entities` + `video_entities(importance)` *(no `type`)*;
    `video_tags(tag,weight)`; update `videos(content_type|duration_s|language)` as needed.
 3. **Sync to Neo4j:** upsert `Video/Topic/Entity` nodes and `HAS_TOPIC/HAS_ENTITY` edges (weights mandatory).
-4. **Build embedding text** using the template (include **description + summary + chapters**, and index-only `type`/`category`).
+4. **Build embedding text** using the template (include **description + summary**, and index-only `type`/`category`).
 5. **Embed** → single video-level vector.
 6. **Index in OpenSearch** (upsert per video): `id`, `title`, `description`, `content_type`, `duration_s`, `language`,
    `entities[]` *(incl. type)*, `topics[]` *(incl. category)*, `tags[]`, `embedding`.
-   *(Summary & chapters are **not** indexed in OS; they’re embedding-only + UI.)*
+   *(Summary is **not** indexed in OS; they’re embedding-only + UI.)*
 
 ---
 

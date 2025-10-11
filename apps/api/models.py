@@ -6,7 +6,7 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy import MetaData
 
 from sqlalchemy import ForeignKey, Index, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 # Naming convention helps Alembic autogenerate predictable constraint names
@@ -54,7 +54,7 @@ class Video(Base):
     title = Column(String, nullable=False, default="", server_default="")
     description = Column(String, nullable=False, default="", server_default="")
 
-    content_type = Column(String, nullable=True)  # tutorial|review|...|other
+    content_type = Column(String, nullable=True)
     language = Column(String, nullable=True, default="en", server_default="en")
 
     original_filename = Column(String, nullable=False)
@@ -152,13 +152,6 @@ class VideoSummary(Base):
 
     video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
     short_summary = Column(Text, nullable=False)
-
-
-class VideoChapters(Base):
-    __tablename__ = "video_chapters"
-
-    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
-    chapters = Column(ARRAY(Text), nullable=True)
 
 
 class Topic(Base):
