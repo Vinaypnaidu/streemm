@@ -62,10 +62,18 @@ class Settings:
         self.opensearch_username = os.getenv("OPENSEARCH_USERNAME", "admin")
         self.opensearch_password = os.getenv("OPENSEARCH_PASSWORD", "admin")
 
-        # Transcription / Whisper settings
-        self.whisper_enabled = os.getenv("WHISPER_ENABLED", "true").lower() == "true"
-        self.whisper_model = os.getenv("WHISPER_MODEL", "base.en")
-        self.whisper_lang = os.getenv("WHISPER_LANG", "en")
+        # OpenAI (LLM + embeddings)
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        self.openai_chat_model = os.getenv("OPENAI_CHAT_MODEL", "gpt-5-mini")
+        self.openai_embedding_model = os.getenv(
+            "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
+        )
+
+        # Neo4j (graph)
+        self.neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        self.neo4j_username = os.getenv("NEO4J_USERNAME", "neo4j")
+        self.neo4j_password = os.getenv("NEO4J_PASSWORD", "Vinay@neo4j")
+        self.neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
 
         # Email / SMTP
         self.email_enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"

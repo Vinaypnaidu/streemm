@@ -13,3 +13,5 @@ minio==7.2.16
 opensearch-py==3.0.0
 faster-whisper==1.2.0
 aiosmtplib==4.0.2
+neo4j==6.0.2
+openai==2.3.0

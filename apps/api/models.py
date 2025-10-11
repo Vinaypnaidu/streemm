@@ -1,12 +1,12 @@
 # apps/api/models.py
 import uuid
-from sqlalchemy import Column, String, DateTime, Integer, Float, func
+from sqlalchemy import Column, String, DateTime, Integer, Float, func, Numeric, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import MetaData
 
 from sqlalchemy import ForeignKey, Index, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import relationship
 
 # Naming convention helps Alembic autogenerate predictable constraint names
@@ -54,13 +54,16 @@ class Video(Base):
     title = Column(String, nullable=False, default="", server_default="")
     description = Column(String, nullable=False, default="", server_default="")
 
+    content_type = Column(String, nullable=True)  # tutorial|review|...|other
+    language = Column(String, nullable=True, default="en", server_default="en")
+
     original_filename = Column(String, nullable=False)
     storage_key_raw = Column(
         String, nullable=False
     )  # e.g., raw/{user_id}/{video_id}.mp4
 
     status = Column(
-        String, nullable=False, default="uploaded"
+        String, nullable=False, default="uploaded", server_default="uploaded"
     )  # uploaded|processing|ready|failed
     probe = Column(JSONB, nullable=True)
     duration_seconds = Column(Float, nullable=True)
@@ -141,4 +144,70 @@ class WatchHistory(Base):
 
     __table_args__ = (
         Index("ix_watch_history_user_lastwatched", "user_id", "last_watched_at"),
+    )
+
+
+class VideoSummary(Base):
+    __tablename__ = "video_summary"
+
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    short_summary = Column(Text, nullable=False)
+
+
+class VideoChapters(Base):
+    __tablename__ = "video_chapters"
+
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    chapters = Column(ARRAY(Text), nullable=True)
+
+
+class Topic(Base):
+    __tablename__ = "topics"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    name = Column(String, nullable=False)
+    canonical_name = Column(String, nullable=False, unique=True)
+
+
+class Entity(Base):
+    __tablename__ = "entities"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    name = Column(String, nullable=False)
+    canonical_name = Column(String, nullable=False, unique=True)
+
+
+class VideoTopic(Base):
+    __tablename__ = "video_topics"
+
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    topic_id = Column(UUID(as_uuid=True), ForeignKey("topics.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    prominence = Column(Numeric(3, 2), nullable=False)
+
+    __table_args__ = (
+        Index("ix_video_topics_topic_video", "topic_id", "video_id"),
+    )
+
+
+class VideoEntity(Base):
+    __tablename__ = "video_entities"
+
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    entity_id = Column(UUID(as_uuid=True), ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    importance = Column(Numeric(3, 2), nullable=False)
+
+    __table_args__ = (
+        Index("ix_video_entities_entity_video", "entity_id", "video_id"),
+    )
+
+
+class VideoTag(Base):
+    __tablename__ = "video_tags"
+
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    tag = Column(Text, primary_key=True, nullable=False)
+    weight = Column(Numeric(3, 2), nullable=False)
+
+    __table_args__ = (
+        Index("ix_video_tags_tag", "tag"),
     )

@@ -11,6 +11,7 @@ from config import settings
 from db import healthcheck as db_healthcheck
 from search import get_client
 from storage import client as storage_client
+from neo4j import GraphDatabase
 
 log = logging.getLogger("health")
 
@@ -77,6 +78,31 @@ def check_search(skip_if_disabled: bool = False) -> Dict[str, Any]:
         return {"ok": True, "error": str(e), "optional": True}
 
 
+def check_neo4j(skip_if_disabled: bool = False) -> Dict[str, Any]:
+    """Check if Neo4j is working (optional service)."""
+    uri = (settings.neo4j_uri or "").strip()
+    if not uri:
+        return {"ok": True, "skipped": True, "reason": "Neo4j URI not configured"}
+    
+    if skip_if_disabled:
+        return {"ok": True, "skipped": True, "reason": "optional check skipped"}
+    
+    try:
+        driver = GraphDatabase.driver(
+            uri,
+            auth=(settings.neo4j_username or "", settings.neo4j_password or "")
+        )
+        driver.verify_connectivity()
+        with driver.session(database=settings.neo4j_database or "neo4j") as session:
+            rec = session.run("RETURN 1 AS ok").single()
+            ok_val = bool(rec and rec.get("ok", 0))
+        driver.close()
+        return {"ok": ok_val}
+    except Exception as e:
+        log.warning("Neo4j health check failed: %s", e)
+        return {"ok": True, "error": str(e), "optional": True}
+
+
 def collect_health_status(include_optional: bool = True) -> Dict[str, Any]:
     """
     Run all health checks and return overall status.
@@ -93,6 +119,7 @@ def collect_health_status(include_optional: bool = True) -> Dict[str, Any]:
     
     # Run optional checks
     search = check_search(skip_if_disabled=not include_optional)
+    neo4j = check_neo4j(skip_if_disabled=not include_optional)
     
     # Determine overall health - only required services affect this
     overall_ok = all([
@@ -108,6 +135,7 @@ def collect_health_status(include_optional: bool = True) -> Dict[str, Any]:
             "cache": cache,
             "object_storage": storage,
             "search": search,
+            "neo4j": neo4j
         }
     }
 
