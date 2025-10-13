@@ -20,6 +20,7 @@ from models import (
     VideoTopic, VideoEntity,
 )
 
+log = logging.getLogger("extract")
 
 class TopicItem(BaseModel):
     name: str
