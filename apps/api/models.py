@@ -54,7 +54,7 @@ class Video(Base):
     title = Column(String, nullable=False, default="", server_default="")
     description = Column(String, nullable=False, default="", server_default="")
 
-    content_type = Column(String, nullable=True)
+    content_type = Column(String, nullable=True) # entertainment | educational | review | interview | news | lifestyle | other
     language = Column(String, nullable=True, default="en", server_default="en")
 
     original_filename = Column(String, nullable=False)
@@ -64,7 +64,7 @@ class Video(Base):
 
     status = Column(
         String, nullable=False, default="uploaded", server_default="uploaded"
-    )  # uploaded|processing|ready|failed
+    )  # uploaded | processing | ready | failed
     probe = Column(JSONB, nullable=True)
     duration_seconds = Column(Float, nullable=True)
     checksum_sha256 = Column(String, nullable=True)
@@ -191,16 +191,4 @@ class VideoEntity(Base):
 
     __table_args__ = (
         Index("ix_video_entities_entity_video", "entity_id", "video_id"),
-    )
-
-
-class VideoTag(Base):
-    __tablename__ = "video_tags"
-
-    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
-    tag = Column(Text, primary_key=True, nullable=False)
-    weight = Column(Numeric(3, 2), nullable=False)
-
-    __table_args__ = (
-        Index("ix_video_tags_tag", "tag"),
     )

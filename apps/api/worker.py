@@ -24,6 +24,7 @@ from storage import (
     build_caption_key,
 )
 from search import index_video_metadata
+from extract import extract_from_transcript, persist_result
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("worker")
@@ -231,14 +232,25 @@ def _transcode_hls_480p(src_path: str, out_dir: str, gop: int) -> None:
     log.info(json.dumps({"step": "hls_480p", "duration_ms": dt}))
 
 
-def _generate_thumbnail(src_path: str, out_path: str) -> None:
+def _generate_thumbnail(src_path: str, out_path: str, offset_seconds: float = 0.0) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     t0 = time.time()
+
+    # format offset as HH:MM:SS.mmm
+    try:
+        ts = max(0.0, float(offset_seconds))
+    except Exception:
+        ts = 0.0
+    h = int(ts // 3600)
+    m = int((ts % 3600) // 60)
+    s = ts - (h * 3600 + m * 60)
+    ts_str = f"{h:02d}:{m:02d}:{s:06.3f}"
+
     cmd = [
         settings.ffmpeg_bin,
         "-y",
         "-ss",
-        "00:00:00.000",
+        ts_str,
         "-i",
         src_path,
         "-frames:v",
@@ -255,7 +267,7 @@ def _generate_thumbnail(src_path: str, out_path: str) -> None:
         raise RuntimeError(
             f"ffmpeg(thumbnail) failed: code={res.returncode} err={res.stderr.strip()}"
         )
-    log.info(json.dumps({"step": "thumbnail", "duration_ms": dt}))
+    log.info(json.dumps({"step": "thumbnail", "duration_ms": dt, "seek": ts_str}))
 
 
 def _write_vtt(segments, out_path: str) -> None:
@@ -543,7 +555,13 @@ def process_video(video_id: str, reason: str) -> None:
             exists_thumb, _ = object_exists(settings.s3_bucket, thumb_key)
             if not exists_thumb:
                 thumb_local = os.path.join(tmpd, "poster.jpg")
-                _generate_thumbnail(local_raw, thumb_local)
+                # seek to 10% of duration; fallback to 0 if unknown
+                offset_sec = 0.0
+                try:
+                    offset_sec = max(0.0, float(duration) * 0.10) if (duration is not None) else 0.0
+                except Exception:
+                    offset_sec = 0.0
+                _generate_thumbnail(local_raw, thumb_local, offset_sec)
                 # Reuse upload_dir would add directory; upload single file instead:
                 from storage import (
                     client,
@@ -564,6 +582,8 @@ def process_video(video_id: str, reason: str) -> None:
                     )
                 )
 
+            chunks = None
+            
             # Transcription
             caption_key = build_caption_key(video_id, settings.whisper_lang)
             has_vtt, _ = object_exists(settings.s3_bucket, caption_key)
@@ -617,6 +637,28 @@ def process_video(video_id: str, reason: str) -> None:
                             log.exception("index_transcript_chunks_failed")
                 except Exception:
                     log.exception("transcription_failed")
+
+        # Extraction (LLM): use transcript chunks if available; otherwise degrade to title/description
+        try:
+            with SessionLocal() as db:
+                v = db.get(Video, uuid.UUID(video_id))
+                if v:
+                    res = extract_from_transcript(
+                        video_id,
+                        v.title or "",
+                        v.description or "",
+                        chunks,  # may be None
+                    )
+                    if res:
+                        try:
+                            persist_result(db, video_id, res)
+                            log.info(json.dumps({"video_id": video_id, "step": "extract", "status": "persisted"}))
+                        except Exception:
+                            log.exception("extract_persist_failed")
+                    else:
+                        log.info(json.dumps({"video_id": video_id, "step": "extract", "skip": "no_result"}))
+        except Exception:
+            log.exception("extract_failed")
 
         # Upsert asset records
         with SessionLocal() as db:

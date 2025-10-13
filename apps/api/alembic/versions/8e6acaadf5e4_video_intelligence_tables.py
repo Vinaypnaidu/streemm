@@ -1,8 +1,8 @@
 """video intelligence tables
 
-Revision ID: c35743a4f9dd
+Revision ID: 8e6acaadf5e4
 Revises: 6b5b3b8e03a4
-Create Date: 2025-10-11 22:56:36.132882
+Create Date: 2025-10-13 22:02:33.439600
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'c35743a4f9dd'
+revision: str = '8e6acaadf5e4'
 down_revision: Union[str, Sequence[str], None] = '6b5b3b8e03a4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -50,14 +50,6 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['video_id'], ['videos.id'], name=op.f('fk_video_summary_video_id_videos'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('video_id', name=op.f('pk_video_summary'))
     )
-    op.create_table('video_tags',
-    sa.Column('video_id', sa.UUID(), nullable=False),
-    sa.Column('tag', sa.Text(), nullable=False),
-    sa.Column('weight', sa.Numeric(precision=3, scale=2), nullable=False),
-    sa.ForeignKeyConstraint(['video_id'], ['videos.id'], name=op.f('fk_video_tags_video_id_videos'), ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('video_id', 'tag', name=op.f('pk_video_tags'))
-    )
-    op.create_index('ix_video_tags_tag', 'video_tags', ['tag'], unique=False)
     op.create_table('video_topics',
     sa.Column('video_id', sa.UUID(), nullable=False),
     sa.Column('topic_id', sa.UUID(), nullable=False),
@@ -79,8 +71,6 @@ def downgrade() -> None:
     op.drop_column('videos', 'content_type')
     op.drop_index('ix_video_topics_topic_video', table_name='video_topics')
     op.drop_table('video_topics')
-    op.drop_index('ix_video_tags_tag', table_name='video_tags')
-    op.drop_table('video_tags')
     op.drop_table('video_summary')
     op.drop_index('ix_video_entities_entity_video', table_name='video_entities')
     op.drop_table('video_entities')

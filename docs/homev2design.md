@@ -30,7 +30,6 @@
 ```json
 {
   "content_type": "entertainment|educational|review|interview|news|lifestyle|other",
-  "duration_s": 0.0,
   "language": "en"
 }
 ```
@@ -63,7 +62,7 @@ Entities: {name1 (person)} | {name2 (product)}   // include entity type inline
 
 Tags: {tag1}, {tag2}, {tag3}
 
-Metadata: content_type={tutorial|...}, language={en}
+Metadata: content_type={tutorial|...}
 ```
 
 ---

@@ -62,9 +62,14 @@ class Settings:
         self.opensearch_username = os.getenv("OPENSEARCH_USERNAME", "admin")
         self.opensearch_password = os.getenv("OPENSEARCH_PASSWORD", "admin")
 
+        # Transcription / Whisper settings
+        self.whisper_enabled = os.getenv("WHISPER_ENABLED", "true").lower() == "true"
+        self.whisper_model = os.getenv("WHISPER_MODEL", "base.en")
+        self.whisper_lang = os.getenv("WHISPER_LANG", "en")
+
         # OpenAI (LLM + embeddings)
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
-        self.openai_chat_model = os.getenv("OPENAI_CHAT_MODEL", "gpt-5-mini")
+        self.openai_chat_model = os.getenv("OPENAI_CHAT_MODEL", "gpt-5")
         self.openai_embedding_model = os.getenv(
             "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
         )
