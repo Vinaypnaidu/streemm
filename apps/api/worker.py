@@ -292,6 +292,40 @@ def _write_vtt(segments, out_path: str) -> None:
         f.write("\n".join(lines))
 
 
+def _read_vtt(vtt_path: str):
+    def _parse_ts(s: str) -> float:
+        s = s.replace(",", ".").strip()
+        h, m, rest = s.split(":")
+        sec = float(rest)
+        return int(h) * 3600 + int(m) * 60 + sec
+
+    segments = []
+    with open(vtt_path, "r", encoding="utf-8") as f:
+        lines = [l.rstrip("\n") for l in f]
+
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if "-->" in line:
+            try:
+                start_s, end_s = [p.strip() for p in line.split("-->")]
+                i += 1
+                text_lines = []
+                while i < len(lines) and lines[i].strip():
+                    text_lines.append(lines[i].strip())
+                    i += 1
+                if text_lines:
+                    segments.append({
+                        "start": _parse_ts(start_s),
+                        "end": _parse_ts(end_s),
+                        "text": " ".join(text_lines),
+                    })
+            except Exception:
+                pass
+        i += 1
+    return segments
+
+
 def _transcribe_with_faster_whisper(audio_path: str, model_name: str, language: str):
     try:
         from faster_whisper import WhisperModel
@@ -613,7 +647,10 @@ def process_video(video_id: str, reason: str) -> None:
                     segments = _transcribe_with_faster_whisper(
                         audio_path, settings.whisper_model, settings.whisper_lang
                     )
-                    if segments:
+                    if not segments or not any((s.get("text") or "").strip() for s in segments):
+                        log.info(json.dumps({"video_id": video_id, "step": "transcription", "skip": "no_speech"}))
+                        segments = []
+                    else:
                         # Write VTT
                         vtt_local = os.path.join(tmpd, "captions.vtt")
                         _write_vtt(segments, vtt_local)
@@ -635,8 +672,32 @@ def process_video(video_id: str, reason: str) -> None:
                             index_transcript_chunks(video_id, chunks)
                         except Exception:
                             log.exception("index_transcript_chunks_failed")
+                            raise
                 except Exception:
                     log.exception("transcription_failed")
+                    raise
+            elif has_vtt:
+                # VTT already present; rebuild chunks and reindex in OpenSearch
+                try:
+                    vtt_local = os.path.join(tmpd, "captions.vtt")
+                    download_object(settings.s3_bucket, caption_key, vtt_local)
+                    segments = _read_vtt(vtt_local)
+                    if not segments or not any((s.get("text") or "").strip() for s in segments):
+                        log.info(json.dumps({"video_id": video_id, "step": "transcript_index", "source": "vtt", "skip": "no_segments"}))
+                    else:
+                        from search import index_transcript_chunks
+                        chunks = _chunk_segments(segments)
+                        try:
+                            index_transcript_chunks(video_id, chunks)
+                            log.info(json.dumps({"video_id": video_id, "step": "transcript_index", "source": "vtt", "chunks": len(chunks)}))
+                        except Exception:
+                            log.exception("index_transcript_chunks_failed_from_vtt")
+                            raise
+                    else:
+                        log.info(json.dumps({"video_id": video_id, "step": "transcript_index", "source": "vtt", "skip": "no_segments"}))
+                except Exception:
+                    log.exception("download_or_parse_vtt_failed")
+                    raise
 
         # Extraction (LLM): use transcript chunks if available; otherwise degrade to title/description
         try:
@@ -649,16 +710,20 @@ def process_video(video_id: str, reason: str) -> None:
                         v.description or "",
                         chunks,  # may be None
                     )
-                    if res:
-                        try:
-                            persist_result(db, video_id, res)
-                            log.info(json.dumps({"video_id": video_id, "step": "extract", "status": "persisted"}))
-                        except Exception:
-                            log.exception("extract_persist_failed")
-                    else:
-                        log.info(json.dumps({"video_id": video_id, "step": "extract", "skip": "no_result"}))
+                    if res is None:
+                        # OpenAI call or JSON parse failed; retry via outer backoff
+                        raise RuntimeError("llm_no_result")
+
+                    # JSON returned; persist (idempotent), even if arrays are empty
+                    try:
+                        persist_result(db, video_id, res)
+                        log.info(json.dumps({"video_id": video_id, "step": "extract", "status": "persisted"}))
+                    except Exception:
+                        log.exception("extract_persist_failed")
+                        raise
         except Exception:
             log.exception("extract_failed")
+            raise
 
         # Upsert asset records
         with SessionLocal() as db:
