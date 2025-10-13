@@ -677,14 +677,12 @@ def process_video(video_id: str, reason: str) -> None:
                     log.exception("transcription_failed")
                     raise
             elif has_vtt:
-                # VTT already present; rebuild chunks and reindex in OpenSearch
+                # VTT already present; rebuild chunks and (re)index in OpenSearch
                 try:
                     vtt_local = os.path.join(tmpd, "captions.vtt")
                     download_object(settings.s3_bucket, caption_key, vtt_local)
                     segments = _read_vtt(vtt_local)
-                    if not segments or not any((s.get("text") or "").strip() for s in segments):
-                        log.info(json.dumps({"video_id": video_id, "step": "transcript_index", "source": "vtt", "skip": "no_segments"}))
-                    else:
+                    if segments:
                         from search import index_transcript_chunks
                         chunks = _chunk_segments(segments)
                         try:
