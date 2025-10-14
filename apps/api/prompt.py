@@ -60,12 +60,13 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    TOPIC EXTRACTION GUIDANCE FOR ENTERTAINMENT:
    Topics typically answer: "What type/genre/style of entertainment is this?"
    Generally extract 1-3 broad categorization tags. Mix high-level (e.g., "comedy", "music", "gaming") with slightly more specific style/genre tags (e.g., "indie rock", "battle royale") when helpful for discovery. Using both levels together when possible (e.g., "music" + "indie rock") creates stronger search signals.
-   Entities carry most of the specificity, so keep topics focused on categorization rather than unique details.
+   Entities carry most of the specificity, so keep topics focused on categorization rather than unique details. 
    
    Entertainment is diverse - here are some example patterns to guide you. There could be more, so decide accordingly what to extract:
    
    A) NARRATIVE CONTENT (sitcoms, series, short films, vlogs):
       Typically helpful: Show/series name and main characters (entities) + broad genre/format (topics)
+      Less useful: Very specific plot elements that don't help categorize
       
       EXTRACT entities: Characters, show names, locations featured, channel names (3-8 typical)
          Examples: "michael scott", "stranger things", "dwight schrute", "the office"
@@ -75,7 +76,8 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    B) GAMING CONTENT (let's plays, gameplay, gaming commentary):
       Typically helpful: Game title (entity) is primary + gameplay genre/style (topics) adds context
-      
+      Less useful: Specific level names, mission numbers, or momentary gameplay events
+
       EXTRACT entities: Game titles, characters, streamers, gaming channels (1-6 typical)
          Examples: "minecraft", "call of duty warzone", "pewdiepie", "valorant"
       
@@ -84,7 +86,8 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    C) REACTION & COMMENTARY (reactions, commentary videos):
       Typically helpful: What's being reacted to (entity) + type of analysis if it's a defining focus
-      
+      Less useful: Specific quotes, timestamps, or personal opinions expressed in the reaction
+
       EXTRACT entities: Content being reacted to, creators reacting, original creators (1-6 typical)
          Examples: "game of thrones finale", "super bowl halftime show", "kendrick lamar"
       
@@ -93,7 +96,8 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    D) PERFORMANCE & MUSIC (concerts, behind-the-scenes, artist content):
       Typically helpful: Artist/song name (entity) + "music" + genre when relevant creates strong signals
-      
+      Less useful: Specific lyrics, setlist order, or crowd reaction details
+
       EXTRACT entities: Artists, bands, song titles, venues, tour names (1-6 typical)
          Examples: "taylor swift", "eras tour", "anti-hero song", "coachella", "billie eilish"
       
@@ -112,6 +116,7 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    A) TECHNICAL TUTORIALS (coding, software, tech skills):
       Typically helpful: Domains and concepts (topics) + specific tools/frameworks (entities)
+      Less useful: Specific code snippets, variable names, or function names from examples
       Entity guidance: Focus on tools/frameworks that are central to what's being taught.
       
       EXTRACT entities: Languages, frameworks, tools, IDEs, libraries that are prominently featured in the video (2-6 typical)
@@ -122,6 +127,7 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    B) CREATIVE & PRACTICAL SKILLS (art, cooking, fitness, DIY):
       Typically helpful: Skill domains and techniques (topics) + tools/materials that are central to instruction (entities)
+      Less useful: Specific measurements, ingredient quantities, or step numbers
       Entity guidance: Focus on tools/equipment that are prominently featured or central to what's being taught. For example: including "instant pot" is helpful in "Beginner's guide to Instant Pot cooking" since it is highly relevant to the video, while basic cookware in recipe videos is typically less useful.
       
       EXTRACT entities: Tools, equipment, materials, things that are prominently featured in the video (2-6 typical)
@@ -132,6 +138,7 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    C) ACADEMIC & PROFESSIONAL (courses, lectures, career advice):
       Typically helpful: Academic/professional fields and concepts (topics) + frameworks/resources that are featured (entities)
+      Less useful: Specific lecture numbers, assignment names, or chapter titles
       Entity guidance: Focus on frameworks, books, or platforms that are specifically being taught, reviewed, or recommended - not just casually mentioned in passing.
       
       EXTRACT entities: Frameworks, methodologies, books, certifications, platforms that are prominently featured in the video (2-6 typical)
@@ -147,7 +154,8 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    Topics typically capture product categories, features being evaluated, or use cases discussed - but entities (the actual products) are the primary search mechanism.
    
    Typically helpful: Specific products being reviewed (entities) + product categories and features (topics)
-   
+   Less useful: Specific prices, timestamps, or minor spec details
+
    EXTRACT entities: Specific products with models, brands, software names that are being reviewed in the video (2-8 typical)
       Examples: "iphone 15 pro max", "airpods pro gen 2", "notion app", "m3 macbook pro", "tesla model 3"
    
@@ -163,7 +171,8 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    Generally extract 3-8 topics based on the depth and breadth of conversation.
    
    Typically helpful: People and organizations involved (entities) + discussion themes and subject areas (topics)
-   
+   Less useful: Specific anecdotes, personal stories, or tangential mentions
+
    EXTRACT entities: Full names of guests, hosts, companies, organizations, projects mentioned (3-8 typical)
       Examples: "lex fridman", "sam altman", "openai", "y combinator", "tesla", "spacex"
    
@@ -179,7 +188,8 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    Generally extract 3-8 topics based on the scope of coverage.
    
    Typically helpful: Specific people, places, organizations, and events (entities) + news categories and issue areas (topics)
-   
+   Less useful: Specific dates, times, minor witnesses, or tangential details
+
    EXTRACT entities: People, organizations, locations, specific events/incidents covered in the video (3-8 typical)
       Examples: "silicon valley bank", "sam bankman-fried", "spacex starship", "chatgpt", "federal reserve"
    
@@ -198,7 +208,8 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    A) MOTIVATIONAL & MINDSET (speeches, success stories):
       Typically helpful: Speakers and programs featured (entities) + philosophical frameworks and life domains (topics)
-      
+      Less useful: Specific daily routine timestamps, personal anecdotes, or motivational quotes
+
       EXTRACT entities: Speakers, books referenced, specific programs/challenges featured in the video (2-6 typical)
          Examples: "david goggins", "atomic habits book", "75 hard program", "tony robbins", "jocko willink"
       
@@ -207,7 +218,8 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    B) WELLNESS & SELF-HELP (meditation, productivity, personal growth):
       Typically helpful: Methods, teachers, and resources (entities) + wellness categories and optimization areas (topics)
-      
+      Less useful: Specific meditation durations, routine step numbers, or app feature lists
+
       EXTRACT entities: Methods, teachers, books, apps, programs featured in the video (2-6 typical)
          Examples: "wim hof method", "headspace app", "getting things done book", "tim ferriss", "james clear"
       

@@ -25,6 +25,7 @@ from storage import (
 )
 from search import index_video_metadata
 from extract import extract_from_transcript, persist_result
+from graph import sync_video
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("worker")
@@ -717,6 +718,46 @@ def process_video(video_id: str, reason: str) -> None:
         except Exception:
             # Any unexpected error during extraction should not block readiness
             log.exception("extract_failed")
+
+        # Graph sync
+        try:
+            from models import Topic, Entity, VideoTopic, VideoEntity
+
+            vid_uuid = uuid.UUID(video_id)
+
+            vt_rows = (
+                db.query(VideoTopic, Topic)
+                .join(Topic, VideoTopic.topic_id == Topic.id)
+                .filter(VideoTopic.video_id == vid_uuid)
+                .all()
+            )
+            et_rows = (
+                db.query(VideoEntity, Entity)
+                .join(Entity, VideoEntity.entity_id == Entity.id)
+                .filter(VideoEntity.video_id == vid_uuid)
+                .all()
+            )
+
+            g_topics = [
+                {
+                    "id": str(t[1].id),
+                    "canonical_name": (t[1].canonical_name or "").strip().lower(),
+                    "prominence": float(t[0].prominence),
+                }
+                for t in vt_rows
+            ]
+            g_entities = [
+                {
+                    "id": str(e[1].id),
+                    "canonical_name": (e[1].canonical_name or "").strip().lower(),
+                    "importance": float(e[0].importance),
+                }
+                for e in et_rows
+            ]
+
+            sync_video(video_id, g_topics, g_entities)
+        except Exception:
+            log.exception("graph_sync_failed")
 
         # Upsert asset records
         with SessionLocal() as db:

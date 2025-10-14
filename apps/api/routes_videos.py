@@ -2,6 +2,7 @@
 import os
 import uuid
 from typing import List, Optional
+import logging, json
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -30,10 +31,18 @@ from storage import (
     delete_prefix,
     build_caption_key,
 )
+from graph import delete_video as graph_delete_video
 from jobs import enqueue_process_video
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-
 from search import index_video_metadata, delete_video_from_search
+
+log = logging.getLogger("videos")
+
+if not log.handlers:
+    handler = logging.StreamHandler()
+    log.addHandler(handler)
+log.setLevel(logging.INFO)
+
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -302,16 +311,25 @@ def delete_video(
         captions_prefix = f"captions/{video_id}/"
         delete_prefix(settings.s3_bucket, captions_prefix)
     except Exception:
-        # Surface as 500 if storage deletion throws unexpectedly
+        log.exception("storage_delete_failed")
         raise HTTPException(status_code=500, detail="Failed to delete from storage")
 
     # Remove from search index
     try:
         delete_video_from_search(str(v.id))
+        log.info(json.dumps({"video_id": str(v.id), "step": "search_delete", "status": "ok"}))
     except Exception:
-        pass
+        log.exception("search_delete_failed")
+
+    # Remove from Neo4j graph (best-effort; prune orphans)
+    try:
+        graph_delete_video(str(v.id), prune_orphans=True)
+        log.info(json.dumps({"video_id": str(v.id), "step": "graph_delete", "status": "ok"}))
+    except Exception:
+        log.exception("graph_delete_failed")
 
     # Delete DB rows (VideoAsset rows cascade)
     db.delete(v)
     db.commit()
+    log.info(json.dumps({"video_id": str(vid), "step": "video_delete", "status": "ok"}))
     return Ok(ok=True)
