@@ -66,7 +66,7 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    A) NARRATIVE CONTENT (sitcoms, series, short films, vlogs):
       Typically helpful: Show/series name and main characters (entities) + broad genre/format (topics)
-      Less useful: Very specific plot elements or overly specific details that don't help categorize
+      Less useful: Specific plot elements and details that don't help categorize
       
       EXTRACT entities: Characters, show names, locations featured, channel names (3-8 typical)
          Examples: "michael scott", "stranger things", "dwight schrute", "the office"
@@ -330,7 +330,7 @@ CRITICAL RULES:
 - Follow PRIORITY guidance for each type - extract more of what matters most
 - Every extraction must help find similar videos
 - When in doubt, extract LESS not more - noise is worse than missing info (like generic stuff is not useful)
-- When extracting topics, think about search behavior: use common terms that people would actually search for to find this type of content. Topics should be general or moderately specific based on what's helpful for discovery or grouping similar videos - not ultra-specific stuff.
+- When extracting topics, think about search behavior: use common terms that people would actually search for to find this type of content. Topics should be general enough based on what's helpful for discovery or grouping similar videos - not specific details.
 - JSON only response, no markdown, no explanations outside JSON
 
 BEFORE YOU START:
