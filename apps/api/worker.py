@@ -672,10 +672,8 @@ def process_video(video_id: str, reason: str) -> None:
                             index_transcript_chunks(video_id, chunks)
                         except Exception:
                             log.exception("index_transcript_chunks_failed")
-                            raise
                 except Exception:
                     log.exception("transcription_failed")
-                    raise
             elif has_vtt:
                 # VTT already present; rebuild chunks and (re)index in OpenSearch
                 try:
@@ -690,12 +688,10 @@ def process_video(video_id: str, reason: str) -> None:
                             log.info(json.dumps({"video_id": video_id, "step": "transcript_index", "source": "vtt", "chunks": len(chunks)}))
                         except Exception:
                             log.exception("index_transcript_chunks_failed_from_vtt")
-                            raise
                     else:
                         log.info(json.dumps({"video_id": video_id, "step": "transcript_index", "source": "vtt", "skip": "no_segments"}))
                 except Exception:
                     log.exception("download_or_parse_vtt_failed")
-                    raise
 
         # Extraction (LLM): use transcript chunks if available; otherwise degrade to title/description
         try:
@@ -709,19 +705,18 @@ def process_video(video_id: str, reason: str) -> None:
                         chunks,  # may be None
                     )
                     if res is None:
-                        # OpenAI call or JSON parse failed; retry via outer backoff
-                        raise RuntimeError("llm_no_result")
-
-                    # JSON returned; persist (idempotent), even if arrays are empty
-                    try:
-                        persist_result(db, video_id, res)
-                        log.info(json.dumps({"video_id": video_id, "step": "extract", "status": "persisted"}))
-                    except Exception:
-                        log.exception("extract_persist_failed")
-                        raise
+                        # OpenAI call or JSON parse failed; best-effort, do not block finalization
+                        log.info(json.dumps({"video_id": video_id, "step": "extract", "skip": "llm_no_result"}))
+                    else:
+                        # JSON returned; persist (idempotent), even if arrays are empty
+                        try:
+                            persist_result(db, video_id, res)
+                            log.info(json.dumps({"video_id": video_id, "step": "extract", "status": "persisted"}))
+                        except Exception:
+                            log.exception("extract_persist_failed")
         except Exception:
+            # Any unexpected error during extraction should not block readiness
             log.exception("extract_failed")
-            raise
 
         # Upsert asset records
         with SessionLocal() as db:
