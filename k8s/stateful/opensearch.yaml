@@ -47,6 +47,8 @@ spec:
           value: "true"
         - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
           value: "Vinay@Open5e@rch"
+        - name: logger.level
+          value: "WARN"
         volumeMounts:
         - name: data
           mountPath: /usr/share/opensearch/data

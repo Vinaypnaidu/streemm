@@ -10,7 +10,7 @@ Transcript:
 END OF TRANSCRIPT.
 
 EXTRACTION STRATEGY:
-Extract ONLY information that helps users discover similar or related videos. Think carefully about what makes THIS video unique and findable.
+Extract ONLY information that helps users discover similar or related videos. Understand the essence of the video by analyzing the transcript, then extract only the absolutely necessary information that reflects general high level topics and important entities.
 
 STEP 1: IDENTIFY THE VIDEO TYPE
 First, determine what type of content this is using the categories and examples below.
@@ -66,42 +66,42 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    A) NARRATIVE CONTENT (sitcoms, series, short films, vlogs):
       Typically helpful: Show/series name and main characters (entities) + broad genre/format (topics)
-      Less useful: Specific plot elements and details that don't help categorize
+      Less useful: Very specific plot elements or overly specific details that don't help categorize
       
-      EXTRACT entities: Characters, show names, locations featured, channel names (3-8 typical)
+      EXTRACT entities: Characters, show names, locations featured, channel names (2-5 typical)
          Examples: "michael scott", "stranger things", "dwight schrute", "the office"
       
-      EXTRACT topics: Usually broad genre/format/style tags (2-5 topics typical)
+      EXTRACT topics: Usually broad genre/format/style tags (1-3 topics typical)
          Examples: "comedy", "sitcom", "workplace comedy", "horror series", "travel vlog", "daily vlog"
    
    B) GAMING CONTENT (let's plays, gameplay, gaming commentary):
       Typically helpful: Game title (entity) is primary + gameplay genre/style (topics) adds context
       Less useful: Specific level names, mission numbers, or momentary gameplay events
 
-      EXTRACT entities: Game titles, characters, streamers, gaming channels (1-6 typical)
+      EXTRACT entities: Game titles, characters, streamers, gaming channels (1-3 typical)
          Examples: "minecraft", "call of duty warzone", "pewdiepie", "valorant"
       
-      EXTRACT topics: Often includes "gaming" + specific genre or gameplay style (1-4 topics typical)
+      EXTRACT topics: Often includes "gaming" + specific genre or gameplay style (1-3 topics typical)
          Examples: "gaming", "survival horror", "battle royale", "speedrunning", "fighting games"
    
    C) REACTION & COMMENTARY (reactions, commentary videos):
       Typically helpful: What's being reacted to (entity) + type of analysis if it's a defining focus
       Less useful: Specific quotes, timestamps, or personal opinions expressed in the reaction
 
-      EXTRACT entities: Content being reacted to, creators reacting, original creators (1-6 typical)
+      EXTRACT entities: Content being reacted to, creators reacting, original creators (1-3 typical)
          Examples: "game of thrones finale", "super bowl halftime show", "kendrick lamar"
       
-      EXTRACT topics: Type/style of commentary when it defines the video (1-4 topics typical)
+      EXTRACT topics: Type/style of commentary when it defines the video (1-3 topics typical)
          Examples: "reaction content", "music analysis", "film critique", "sports commentary", "movie review"
    
    D) PERFORMANCE & MUSIC (concerts, behind-the-scenes, artist content):
       Typically helpful: Artist/song name (entity) + "music" + genre when relevant creates strong signals
       Less useful: Specific lyrics, setlist order, or crowd reaction details
 
-      EXTRACT entities: Artists, bands, song titles, venues, tour names (1-6 typical)
+      EXTRACT entities: Artists, bands, song titles, venues, tour names (1-3 typical)
          Examples: "taylor swift", "eras tour", "anti-hero song", "coachella", "billie eilish"
       
-      EXTRACT topics: Often includes "music" + genre or performance type (1-4 topics typical)
+      EXTRACT topics: Often includes "music" + genre or performance type (1-3 topics typical)
          Examples: "music", "pop music", "indie rock", "live concert", "acoustic performance", "jazz improvisation"
 
 2. EDUCATIONAL
@@ -110,7 +110,7 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    TOPIC EXTRACTION GUIDANCE FOR EDUCATIONAL:
    Topics are the primary search mechanism for educational content. Extract broader subject areas AND more specific topics when relevant.
    Match topic specificity to the video's scope and essence: a general "Introduction to Programming" course gets broader topics like "programming" and "computer science", while a focused "CSS Flexbox Layout Guide" gets slightly more specific topics like "css", "web development", and "layout design".
-   Generally extract 3-8 topics. Focus on what's actually being taught, not just mentioned.
+   Generally extract 2-5 topics. Focus on what's actually being taught, not just mentioned.
    
    Educational content focuses on teaching - here are some example patterns to guide you. There could be more, so decide accordingly what to extract:
    
@@ -119,10 +119,10 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
       Less useful: Specific code snippets, variable names, or function names from examples
       Entity guidance: Focus on tools/frameworks that are central to what's being taught.
       
-      EXTRACT entities: Languages, frameworks, tools, IDEs, libraries that are prominently featured in the video (2-6 typical)
+      EXTRACT entities: Languages, frameworks, tools, IDEs, libraries that are prominently featured in the video (2-5 typical)
          Examples: "python", "react", "visual studio code", "pandas library", "postgresql", "figma"
       
-      EXTRACT topics: Technical domains, programming concepts, skill areas (3-8 topics typical)
+      EXTRACT topics: Technical domains, programming concepts, skill areas (2-5 topics typical)
          Examples: "programming", "web development", "javascript", "data science", "machine learning", "graphic design", "version control", "database management"
    
    B) CREATIVE & PRACTICAL SKILLS (art, cooking, fitness, DIY):
@@ -130,10 +130,10 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
       Less useful: Specific measurements, ingredient quantities, or step numbers
       Entity guidance: Focus on tools/equipment that are prominently featured or central to what's being taught. For example: including "instant pot" is helpful in "Beginner's guide to Instant Pot cooking" since it is highly relevant to the video, while basic cookware in recipe videos is typically less useful.
       
-      EXTRACT entities: Tools, equipment, materials, things that are prominently featured in the video (2-6 typical)
+      EXTRACT entities: Tools, equipment, materials, things that are prominently featured in the video (2-5 typical)
          Examples: "air fryer", "instant pot", "watercolor paints", "procreate app", "resistance bands", "kettlebell"
       
-      EXTRACT topics: Craft domains, techniques, skill categories (3-8 topics typical)
+      EXTRACT topics: Craft domains, techniques, skill categories (2-5 topics typical)
          Examples: "cooking", "italian cuisine", "baking", "painting", "portrait drawing", "digital art", "fitness", "weight training", "yoga", "woodworking", "furniture building", "home renovation"
    
    C) ACADEMIC & PROFESSIONAL (courses, lectures, career advice):
@@ -141,10 +141,10 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
       Less useful: Specific lecture numbers, assignment names, or chapter titles
       Entity guidance: Focus on frameworks, books, or platforms that are specifically being taught, reviewed, or recommended - not just casually mentioned in passing.
       
-      EXTRACT entities: Frameworks, methodologies, books, certifications, platforms that are prominently featured in the video (2-6 typical)
+      EXTRACT entities: Frameworks, methodologies, books, certifications, platforms that are prominently featured in the video (2-5 typical)
          Examples: "atomic habits book", "coursera", "aws certification"
       
-      EXTRACT topics: Academic fields, professional domains, skill areas (3-8 topics typical)
+      EXTRACT topics: Academic fields, professional domains, skill areas (2-5 topics typical)
          Examples: "mathematics", "algebra", "physics", "biology", "world history", "economics", "business management", "leadership skills", "public speaking", "financial planning", "resume writing"
 
 3. REVIEW
@@ -156,10 +156,10 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    Typically helpful: Specific products being reviewed (entities) + product categories and features (topics)
    Less useful: Specific prices, timestamps, or minor spec details
 
-   EXTRACT entities: Specific products with models, brands, software names that are being reviewed in the video (2-8 typical)
+   EXTRACT entities: Specific products with models, brands, software names that are being reviewed in the video (2-5 typical)
       Examples: "iphone 15 pro max", "airpods pro gen 2", "notion app", "m3 macbook pro", "tesla model 3"
    
-   EXTRACT topics: Product categories, features being evaluated, or use cases (2-6 topics typical)
+   EXTRACT topics: Product categories, features being evaluated, or use cases (2-5 topics typical)
       Examples: "smartphone photography", "noise cancellation", "productivity software", "electric vehicles", "wireless earbuds", "budget laptops"
 
 4. INTERVIEW
@@ -168,15 +168,15 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    TOPIC EXTRACTION GUIDANCE FOR INTERVIEW:
    Topics capture the major discussion themes and subject areas that get meaningful exploration during the conversation.
    Balance broad themes with specific topics when they receive substantial discussion time. For example: a space podcast might extract both "space exploration" and "black holes" if black holes are discussed in depth.
-   Generally extract 3-8 topics based on the depth and breadth of conversation.
+   Generally extract 2-5 topics based on the depth and breadth of conversation.
    
    Typically helpful: People and organizations involved (entities) + discussion themes and subject areas (topics)
    Less useful: Specific anecdotes, personal stories, or tangential mentions
 
-   EXTRACT entities: Full names of guests, hosts, companies, organizations, projects mentioned (3-8 typical)
+   EXTRACT entities: Full names of guests, hosts, companies, organizations, projects mentioned (2-5 typical)
       Examples: "lex fridman", "sam altman", "openai", "y combinator", "tesla", "spacex"
    
-   EXTRACT topics: Discussion themes - both broad subjects and specific subject areas explored (3-8 topics typical)
+   EXTRACT topics: Discussion themes - both broad subjects and specific subject areas explored (2-5 topics typical)
       Examples: "artificial intelligence", "machine learning", "entrepreneurship", "venture capital", "space exploration", "black holes", "mental health", "cognitive behavioral therapy", "climate change", "solar energy"
 
 5. NEWS
@@ -185,15 +185,15 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    TOPIC EXTRACTION GUIDANCE FOR NEWS:
    Topics help categorize the type of news story and the broader issues being covered - think news categories and policy areas rather than specific incident details.
    Balance story types with issue domains. For example: a banking collapse story might extract both "financial crisis" and "banking regulation" to capture different search angles.
-   Generally extract 3-8 topics based on the scope of coverage.
+   Generally extract 2-5 topics based on the scope of coverage.
    
    Typically helpful: Specific people, places, organizations, and events (entities) + news categories and issue areas (topics)
    Less useful: Specific dates, times, minor witnesses, or tangential details
 
-   EXTRACT entities: People, organizations, locations, specific events/incidents covered in the video (3-8 typical)
+   EXTRACT entities: People, organizations, locations, specific events/incidents covered in the video (2-5 typical)
       Examples: "silicon valley bank", "sam bankman-fried", "spacex starship", "chatgpt", "federal reserve"
    
-   EXTRACT topics: News categories, issue areas, policy domains, phenomena covered (3-8 topics typical)
+   EXTRACT topics: News categories, issue areas, policy domains, phenomena covered (2-5 topics typical)
       Examples: "financial crisis", "banking regulation", "cryptocurrency", "space exploration", "artificial intelligence", "tech industry", "nuclear safety", "climate policy", "healthcare reform", "election coverage"
 
 6. LIFESTYLE
@@ -210,20 +210,20 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
       Typically helpful: Speakers and programs featured (entities) + philosophical frameworks and life domains (topics)
       Less useful: Specific daily routine timestamps, personal anecdotes, or motivational quotes
 
-      EXTRACT entities: Speakers, books referenced, specific programs/challenges featured in the video (2-6 typical)
+      EXTRACT entities: Speakers, books referenced, specific programs/challenges featured in the video (2-5 typical)
          Examples: "david goggins", "atomic habits book", "75 hard program", "tony robbins", "jocko willink"
       
-      EXTRACT topics: Mental frameworks, philosophical approaches, life domains (2-6 topics typical)
+      EXTRACT topics: Mental frameworks, philosophical approaches, life domains (2-5 topics typical)
          Examples: "personal development", "mental toughness", "discipline", "stoicism", "habit formation", "morning routines", "goal setting", "resilience"
    
    B) WELLNESS & SELF-HELP (meditation, productivity, personal growth):
       Typically helpful: Methods, teachers, and resources (entities) + wellness categories and optimization areas (topics)
       Less useful: Specific meditation durations, routine step numbers, or app feature lists
 
-      EXTRACT entities: Methods, teachers, books, apps, programs featured in the video (2-6 typical)
+      EXTRACT entities: Methods, teachers, books, apps, programs featured in the video (2-5 typical)
          Examples: "wim hof method", "headspace app", "getting things done book", "tim ferriss", "james clear"
       
-      EXTRACT topics: Wellness practices, productivity systems, self-optimization areas (2-6 topics typical)
+      EXTRACT topics: Wellness practices, productivity systems, self-optimization areas (2-5 topics typical)
          Examples: "meditation", "mindfulness", "breathwork", "productivity", "time management", "habit building", "sleep optimization", "stress management", "digital minimalism"
 
 7. OTHER
@@ -326,13 +326,17 @@ OUTPUT FORMAT (JSON only, no extra text):
   }}
 }}
 
-CRITICAL RULES:
+CRITICAL RULES (MOST IMPORTANT):
 - Follow PRIORITY guidance for each type - extract more of what matters most
 - Every extraction must help find similar videos
-- When in doubt, extract LESS not more - noise is worse than missing info (like generic stuff is not useful)
-- When extracting topics, think about search behavior: use common terms that people would actually search for to find this type of content. Topics should be general enough based on what's helpful for discovery or grouping similar videos - not specific details.
+- When in doubt, extract LESS not more - noise is worse than missing info
+- When extracting entities, focus on what's prominently featured and central to the video
+- When extracting topics, think about search behavior: use common terms that people would actually search for to find this type of content
+- Topics should be one level more general than the video's specific content - if a video teaches "sourdough starter maintenance," extract "bread baking" or "baking" as topics
+- Higher-level, broader topics should receive higher prominence scores than narrow, specific topics
+- Focus on what helps discovery and grouping, not specific details
 - JSON only response, no markdown, no explanations outside JSON
 
 BEFORE YOU START:
-Your goal is to extract ONLY information that helps users discover similar or related videos. Think carefully about what makes THIS video unique and findable. 
+Your goal is to extract ONLY information that helps users discover similar or related videos. First understand the essence of the video, then extract only the absolutely necessary information that reflects general high level topics and important entities.
 """

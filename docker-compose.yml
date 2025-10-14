@@ -57,6 +57,7 @@ services:
       OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
       bootstrap.memory_lock: "true"
       OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_PASSWORD:-Vinay@Open5e@rch}
+      logger.level: WARN
     ulimits:
       memlock:
         soft: -1
