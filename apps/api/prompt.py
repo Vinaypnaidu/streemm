@@ -66,7 +66,7 @@ EXAMPLE EXTRACTION PATTERNS BY TYPE:
    
    A) NARRATIVE CONTENT (sitcoms, series, short films, vlogs):
       Typically helpful: Show/series name and main characters (entities) + broad genre/format (topics)
-      Less useful: Very specific plot elements that don't help categorize
+      Less useful: Very specific plot elements or overly specific details that don't help categorize
       
       EXTRACT entities: Characters, show names, locations featured, channel names (3-8 typical)
          Examples: "michael scott", "stranger things", "dwight schrute", "the office"
