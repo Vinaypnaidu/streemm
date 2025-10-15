@@ -7,9 +7,9 @@ def _build_prompt(title: str, description: str, transcript_text: str) -> str:
 
 **STEP 2:** Based on the content type, extract:
 - **Summary** — objective 2-4 sentence description
-- **Topics** — concrete subjects/skills covered
-- **Entities** — named things mentioned (people, orgs, products, places, concepts)
-- **Tags** — searchable labels derived from topics and entities
+- **Topics** — main subjects covered
+- **Entities** — named things mentioned (people, orgs, products, places, etc.)
+- **Tags** — searchable labels derived from topics, entities, and video nature
 
 ---
 
@@ -59,81 +59,19 @@ Now that you know the content type, extract the following fields:
 
 ## 2. Topics (`topics`)
 
-Main subjects, skills, concepts, or themes the video focuses on.
+Main subject areas, skills, and concepts the video focuses on.
 
-**What to look for** (varies significantly by content type):
-
-### Entertainment Videos
-Topics answer "What type/genre/style of entertainment is this?" Extract broad categorization tags (1-3 typical).
-
-**Narrative Content** (sitcoms, series, tv shows, short films, vlogs):
-- Topics might cover: genre, format, style
-- Examples: "comedy", "sitcom", "horror series", "travel vlog"
-- **Do NOT extract**: Episode-specific plot points, character arcs, specific story beats
-
-**Gaming Content** (let's plays, gameplay, commentary):
-- Topics might cover: "gaming" + specific genre or gameplay style
-- Examples: "gaming", "survival horror", "battle royale", "speedrunning", "fighting games"
-- **Do NOT extract**: Specific level names, mission numbers, gameplay events
-
-**Reaction & Commentary** (reactions, commentary videos):
-- Topics might cover: type of commentary/analysis when it's a defining focus
-- Examples: "reaction content", "music analysis", "film critique", "sports commentary"
-- **Do NOT extract**: Specific quotes, personal opinions, timestamp details
-
-**Performance & Music** (concerts, performances, artist content):
-- Topics might cover: "music" + genre or performance type
-- Examples: "music", "pop music", "indie rock", "live concert", "acoustic performance"
-- **Do NOT extract**: Specific lyrics, setlist order, crowd reactions
-
----
-
-### Educational Videos
-Topics might cover what's being taught - skills, concepts, techniques (2-5 typical).
-
-**Technical Tutorials** (coding, software, tech):
-- Examples: "programming", "web development", "machine learning", "database management"
-
-**Creative & Practical Skills** (art, cooking, fitness, DIY):
-- Examples: "cooking", "italian cuisine", "baking", "digital art", "fitness", "woodworking"
-
-**Academic & Professional** (courses, lectures, career advice):
-- Examples: "mathematics", "physics", "economics", "leadership skills", "financial planning"
-
----
-
-### Review Videos
-Topics might cover product categories, features being evaluated, use cases.
-- Examples: "smartphone photography", "noise cancellation", "battery performance", "productivity software"
-
----
-
-### Interview Videos
-Topics might cover discussion themes and subject areas explored (2-5 typical).
-- Examples: "artificial intelligence", "entrepreneurship", "climate policy", "mental health"
-
----
-
-### News Videos
-Topics might cover news categories, issue areas, policy domains (2-5 typical).
-- Examples: "financial crisis", "banking regulation", "election coverage", "climate policy"
-
----
-
-### Lifestyle Videos
-Topics might cover life domains, wellness categories, philosophical approaches (2-5 typical).
-
-**Motivational & Mindset**:
-- Examples: "personal development", "mental toughness", "discipline", "habit formation"
-
-**Wellness & Self-Help**:
-- Examples: "meditation", "mindfulness", "productivity", "time management", "stress management"
-
----
+**What to look for** (these are just examples to guide your thinking):
+- **Educational videos** often include skills taught, concepts explained, techniques demonstrated
+- **Entertainment videos** could discuss/cover various subjects - extract selectively based on prominence. Episodic plots and specific details are generally not useful - typically extract 1-3 topics max if highly prominent
+- **Review videos** typically focus on product categories, features being evaluated, comparison points
+- **Interview videos** usually center on subjects discussed, areas of expertise
+- **News videos** commonly cover issues investigated, events covered, policy areas
+- **Lifestyle videos** often explore personal development areas, wellness practices, mindset concepts
 
 **Guidelines:**
-- Focus on **what the video is about** at a categorical level, not episode-specific details
-- Use specific terms when they help categorization: "gradient descent" not just "AI"
+- Focus on **what the video is about**, not just passing mentions
+- Use specific terms when they help: "gradient descent" not just "AI"
 - Normalize names: "machine learning" not "Machine Learning 101"
 - **prominence** (0.0-1.0): Share of video focus
   - 0.8-1.0: Primary/central topic
@@ -148,10 +86,14 @@ Topics might cover life domains, wellness categories, philosophical approaches (
 **Examples:**
 ```json
 {{"name": "Sourdough Baking", "canonical_name": "sourdough baking", "prominence": 0.9}}
-{{"name": "Survival Horror", "canonical_name": "survival horror", "prominence": 0.8}}
 {{"name": "Battery Performance", "canonical_name": "battery performance", "prominence": 0.75}}
 {{"name": "Climate Policy", "canonical_name": "climate policy", "prominence": 0.85}}
 {{"name": "Meditation Techniques", "canonical_name": "meditation techniques", "prominence": 0.7}}
+{{"name": "CSS Grid Layout", "canonical_name": "css grid layout", "prominence": 0.7}}
+{{"name": "Pasta Techniques", "canonical_name": "pasta techniques", "prominence": 0.65}}
+{{"name": "Smartphone Photography", "canonical_name": "smartphone photography", "prominence": 0.8}}
+{{"name": "Machine Learning", "canonical_name": "machine learning", "prominence": 0.8}}
+{{"name": "Gradient Descent", "canonical_name": "gradient descent", "prominence": 0.8}}
 ```
 
 ---
@@ -174,20 +116,24 @@ Entities are **specific instances central to the video** - such as particular pe
 - 0.3-0.4: Mentioned multiple times with context
 - <0.3: Brief mention, omit
 
-**entity_type**: `person`, `organization`, `product`, `place`, `concept`, `event`, `other`
-
 **Format:**
 ```json
 {{"name": "Gordon Ramsay", "canonical_name": "gordon ramsay", "importance": 0.9, "entity_type": "person"}}
 {{"name": "iPhone 15", "canonical_name": "iphone 15", "importance": 0.7, "entity_type": "product"}}
 {{"name": "Paris", "canonical_name": "paris", "importance": 0.5, "entity_type": "place"}}
+{{"name": "OpenAI", "canonical_name": "openai", "importance": 0.8, "entity_type": "organization"}}
+{{"name": "Python", "canonical_name": "python", "importance": 0.85, "entity_type": "programming language"}}
+{{"name": "The Office", "canonical_name": "the office", "importance": 0.9, "entity_type": "tv show"}}
+{{"name": "World War II", "canonical_name": "world war ii", "importance": 0.8, "entity_type": "event"}}
 ```
 
 ---
 
 ## 4. Tags (`tags`)
 
-Searchable labels derived from topics and entities.
+Searchable labels derived from topics, entities, and the video's overall content nature.
+
+**Create a rich, multi-faceted tag set:** Think about how users might discover this content from different angles - include domain/field tags, format/style tags, and key characteristics. Balance broad discoverability with specific detail.
 
 ### A) From Topics (Generalize into broader categories)
 - "gradient descent" → `machine-learning`, `optimization`, `math`
@@ -199,10 +145,17 @@ Searchable labels derived from topics and entities.
 - "TensorFlow" → `google`, `deep-learning`, `python`
 - "iPhone 15" → `apple`, `smartphone`, `ios`
 
+### C) From Video Nature (High-level categorization of what this video is)
+Consider the video's format, type, and high-level categorization:
+- Entertainment examples: `tv-show`, `sitcom`, `comedy`, `gaming`, `music-video`, `vlog`, `travel-vlog`
+- Educational examples: `tutorial`, `course`, `how-to`, `explainer`
+- Review examples: `tech-review`, `product-review`, `comparison`
+- Other examples: `podcast`, `interview`, `documentary`, `news`
+
 **Guidelines:**
 - Use **lowercase, hyphenated** format (`machine-learning`, not `Machine Learning`)
 - Be specific but searchable: `italian-cuisine` > `food` (but include both)
-- Aim for **8-15 tags** total
+- Aim for **8-15 tags** total across all sources
 - Balance specificity with discoverability
 - **weight** (0.0-1.0): Relevance/confidence
   - 0.8-1.0: Core, highly relevant
@@ -243,13 +196,22 @@ Return **valid JSON only** (no markdown, no explanation).
     {{"name": "Display Name", "canonical_name": "lowercase normalized", "prominence": 0.0}}
   ],
   "entities": [
-    {{"name": "Display Name", "canonical_name": "lowercase normalized", "importance": 0.0, "entity_type": "person|organization|product|place|concept|event|other"}}
+    {{"name": "Display Name", "canonical_name": "lowercase normalized", "importance": 0.0, "entity_type": "string"}}
   ],
   "tags": [
     {{"tag": "lowercase-hyphenated", "weight": 0.0}}
   ]
 }}
 ```
+
+---
+
+## CANONICAL NAMING:
+- Use widely recognized forms: "react" not "React.js"
+- People: "firstname lastname" lowercase: "elon musk"
+- Products: include identifiers: "iphone 15 pro" not "iphone"
+- Concepts: industry-standard terms: "machine learning" not "ML"
+- De-duplicate: keep one canonical form per concept
 
 ---
 
@@ -278,9 +240,9 @@ Return **valid JSON only** (no markdown, no explanation).
     {{"tag": "sourdough", "weight": 0.95}},
     {{"tag": "bread", "weight": 0.9}},
     {{"tag": "fermentation", "weight": 0.7}},
-    {{"tag": "cooking", "weight": 0.7}},
-    {{"tag": "culinary-skills", "weight": 0.7}},
-    {{"tag": "food-science", "weight": 0.6}}
+    {{"tag": "cooking", "weight": 0.75}},
+    {{"tag": "culinary-skills", "weight": 0.75}},
+    {{"tag": "tutorial", "weight": 0.6}}
   ]
 }}
 ```

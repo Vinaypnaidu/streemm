@@ -122,9 +122,9 @@ Metadata: content_type={tutorial|...}
 ```
 
 *Mapping hints:* text fields with `keyword` subfields for aggs; `entities`/`topics` as `nested`; `embedding` as `knn_vector`.
-*BM25 fields (no summary):* `title^4`, `topics.name^3`, `entities.name^3`, `description^2`, `tags^1`.
+*BM25 fields (no summary):* `title^3`, `description^2`, `topics.name^1`, `entities.name^1`, `tags^1`.
 
-### 3.3 Neo4j Graph Layer (bipartite, lean)
+### 3.3 Neo4j Graph Layer (lean)
 
 *IDs reuse Postgres primary keys; fetch display names from Postgres/OS at render-time.*
 
