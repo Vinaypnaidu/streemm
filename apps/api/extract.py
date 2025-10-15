@@ -16,8 +16,8 @@ from openai import OpenAI
 
 from models import (
     Video, VideoSummary,
-    Topic, Entity,
-    VideoTopic, VideoEntity,
+    Topic, Entity, Tag,
+    VideoTopic, VideoEntity, VideoTag,
 )
 
 log = logging.getLogger("extract")
@@ -43,6 +43,15 @@ class EntityItem(BaseModel):
         return (v or "").strip().lower()
 
 
+class TagItem(BaseModel):
+    tag: str
+    weight: float = Field(ge=0.0, le=1.0)
+
+    @validator("tag", pre=True)
+    def _canon(cls, v: str) -> str:
+        return (v or "").strip().lower()
+
+
 class ContentAnalysis(BaseModel):
     primary_type: Optional[str] = None
     secondary_type: Optional[str] = None
@@ -53,6 +62,7 @@ class ExtractResult(BaseModel):
     short_summary: Optional[str] = None
     topics: List[TopicItem] = []
     entities: List[EntityItem] = []
+    tags: List[TagItem] = []
     content_type: Optional[str] = None
     language: Optional[str] = None
     content_analysis: Optional[ContentAnalysis] = None  # not persisted
@@ -153,6 +163,22 @@ def _normalize_result(raw: Dict[str, Any]) -> ExtractResult:
         seen.add(cn)
         entities_norm.append(it)
 
+    # Tags: normalize and dedupe by canonical tag string
+    items_tags = []
+    for it in (raw.get("tags") or []):
+        try:
+            items_tags.append(TagItem(**it).dict())
+        except Exception:
+            pass
+    seen = set()
+    tags_norm = []
+    for it in items_tags:
+        tg = it["tag"]
+        if tg in seen:
+            continue
+        seen.add(tg)
+        tags_norm.append(it)
+
     meta = raw.get("metadata") or {}
     ca_raw = raw.get("content_analysis") or {}
     ca_obj = None
@@ -165,6 +191,7 @@ def _normalize_result(raw: Dict[str, Any]) -> ExtractResult:
         short_summary=(raw.get("short_summary") or None),
         topics=[TopicItem(**t) for t in topics_norm],
         entities=[EntityItem(**e) for e in entities_norm],
+        tags=[TagItem(**t) for t in tags_norm],
         content_type=(meta.get("content_type") or None),
         language=(meta.get("language") or None),
         content_analysis=ca_obj,
@@ -198,6 +225,7 @@ def persist_result(db, video_id: str, res: ExtractResult) -> None:
       - video_summary
       - topics + video_topics
       - entities + video_entities
+      - tags + video_tags
       - videos(content_type, language) when provided (no duration from LLM)
     """
     vid = uuid.UUID(video_id)
@@ -277,7 +305,40 @@ def persist_result(db, video_id: str, res: ExtractResult) -> None:
             VideoEntity.entity_id.in_(list(to_drop_e)),
         ).delete(synchronize_session=False)
 
-    # 4) Update videos(content_type, language)
+    # 4) Tags
+    existing_vtags = db.query(VideoTag).filter(VideoTag.video_id == vid).all()
+    have_tag_ids = {row.tag_id for row in existing_vtags}
+    want_tag_ids = set()
+
+    for t in res.tags or []:
+        tg = (t.tag or "").strip().lower()
+        if not tg:
+            continue
+        tag = db.query(Tag).filter(Tag.canonical_name == tg).first()
+        if not tag:
+            tag = Tag(name=tg, canonical_name=tg)
+            db.add(tag)
+            db.flush()
+        want_tag_ids.add(tag.id)
+
+        link = (
+            db.query(VideoTag)
+            .filter(VideoTag.video_id == vid, VideoTag.tag_id == tag.id)
+            .first()
+        )
+        if link:
+            link.weight = float(t.weight)
+        else:
+            db.add(VideoTag(video_id=vid, tag_id=tag.id, weight=float(t.weight)))
+
+    to_drop_t = have_tag_ids - want_tag_ids
+    if to_drop_t:
+        db.query(VideoTag).filter(
+            VideoTag.video_id == vid,
+            VideoTag.tag_id.in_(list(to_drop_t)),
+        ).delete(synchronize_session=False)
+
+    # 5) Update videos(content_type, language)
     v = db.get(Video, vid)
     if v:
         if res.content_type and (v.content_type or "").strip() != res.content_type.strip():

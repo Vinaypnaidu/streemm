@@ -170,6 +170,14 @@ class Entity(Base):
     canonical_name = Column(String, nullable=False, unique=True)
 
 
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    name = Column(String, nullable=False)
+    canonical_name = Column(String, nullable=False, unique=True)
+
+
 class VideoTopic(Base):
     __tablename__ = "video_topics"
 
@@ -191,4 +199,16 @@ class VideoEntity(Base):
 
     __table_args__ = (
         Index("ix_video_entities_entity_video", "entity_id", "video_id"),
+    )
+
+
+class VideoTag(Base):
+    __tablename__ = "video_tags"
+
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    tag_id = Column(UUID(as_uuid=True), ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True, nullable=False)
+    weight = Column(Numeric(3, 2), nullable=False)
+
+    __table_args__ = (
+        Index("ix_video_tags_tag_video", "tag_id", "video_id"),
     )

@@ -1,342 +1,305 @@
 def _build_prompt(title: str, description: str, transcript_text: str) -> str:
-    return f"""You are an expert video analyst extracting information for a video recommendation system that uses both keyword search (BM25) and semantic similarity (KNN).
+    return f"""You are an expert at analyzing video transcripts to extract structured information for a video recommendation system.
 
-VIDEO INPUT:
-Title: {title.strip()}
-Description: {description.strip()}
-Transcript:
-{transcript_text.strip()}
+## Your Task
 
-END OF TRANSCRIPT.
+**STEP 1:** Determine the content_type first — this will guide your entire extraction strategy.
 
-EXTRACTION STRATEGY:
-Extract ONLY information that helps users discover similar or related videos. Understand the essence of the video by analyzing the transcript, then extract only the absolutely necessary information that reflects general high level topics and important entities.
+**STEP 2:** Based on the content type, extract:
+- **Summary** — objective 2-4 sentence description
+- **Topics** — concrete subjects/skills covered
+- **Entities** — named things mentioned (people, orgs, products, places, concepts)
+- **Tags** — searchable labels derived from topics and entities
 
-STEP 1: IDENTIFY THE VIDEO TYPE
-First, determine what type of content this is using the categories and examples below.
+---
 
-VIDEO TYPE CLASSIFICATION & EXAMPLES:
+# STEP 1: Content Type Classification
 
-1. ENTERTAINMENT - Content consumed primarily for enjoyment, storytelling, or artistic expression
-   Examples: sitcoms, TV show clips, web series, short films, sketches, daily vlogs, travel vlogs, challenge videos, prank videos, let's plays, gameplay highlights, reaction videos, storytime videos, photography showcases, concert performances, artist documentaries
+Classify the video's **PRIMARY purpose** first. This determines how you approach extraction.
 
-2. EDUCATIONAL - Teaching skills, explaining concepts, or providing how-to guidance
-   Examples: coding tutorials, cooking recipes, makeup tutorials, fitness workouts, courses, lectures, DIY projects, repair guides, concept explainers, science explainers, language learning, instrument lessons, drawing tutorials, career advice, math lessons, gaming strategy guides
+## Content Type Definitions
 
-3. REVIEW - Evaluating, comparing, or showcasing products/services/media
-   Examples: tech reviews, product reviews, unboxing videos, "X vs Y" comparisons, buying guides, software reviews, movie reviews, book reviews, game reviews, restaurant reviews, long-term reviews, shopping hauls with evaluations
+**ENTERTAINMENT** — Content consumed primarily for enjoyment, storytelling, or artistic expression
+- Examples: sitcoms, web series, sketches, daily vlogs, travel vlogs, challenge videos, prank videos, let's plays, gameplay highlights, reaction videos, storytime videos, photography showcases, concert performances, artist documentaries
 
-4. INTERVIEW - Conversation-driven content with guests or subjects
-   Examples: podcasts, video podcasts, one-on-one interviews, celebrity interviews, talk show clips, panel discussions, roundtables, AMAs, fireside chats, hot seat interviews
+**EDUCATIONAL** — Teaching skills, explaining concepts, or providing how-to guidance
+- Examples: coding tutorials, cooking recipes, makeup tutorials, fitness workouts, courses, lectures, DIY projects, repair guides, concept explainers, science explainers, language learning, instrument lessons, drawing tutorials, career advice, math lessons, gaming strategy guides
 
-5. NEWS - Reporting on current events, investigating issues, or documenting reality
-   Examples: breaking news, news updates, documentaries, mini-docs, investigative journalism, news commentary, event coverage, true crime documentaries, business case studies, explainer journalism, timeline videos
+**REVIEW** — Evaluating, comparing, or showcasing products/services/media
+- Examples: tech reviews, product reviews, unboxing videos, "X vs Y" comparisons, buying guides, software reviews, movie reviews, book reviews, game reviews, restaurant reviews, long-term reviews, shopping hauls with evaluations
 
-6. LIFESTYLE - Personal development, mindset, wellness, and life optimization
-   Examples: motivational speeches, self-help content, productivity advice, habit building, transformation stories, morning routines (habit-focused), mental health content, meditation guides, philosophy videos, goal setting, relationship advice, fitness motivation stories
+**INTERVIEW** — Conversation-driven content with guests or subjects
+- Examples: podcasts, video podcasts, one-on-one interviews, celebrity interviews, talk show clips, panel discussions, roundtables, AMAs, fireside chats, hot seat interviews
 
-7. OTHER - Content that doesn't fit or has insufficient data
-   Examples: music videos (pure music), ASMR videos, clip compilations without narrative, silent films, pure B-roll, corrupted transcripts, abstract/experimental videos, unedited live streams
+**NEWS** — Reporting on current events, investigating issues, or documenting reality
+- Examples: breaking news, news updates, documentaries, mini-docs, investigative journalism, news commentary, event coverage, true crime documentaries, business case studies, explainer journalism, timeline videos
 
-GREY AREA DECISION GUIDE:
-Some content types can be tricky to classify. Here are some common patterns to help guide your thinking, but use your judgment based on the video's primary purpose:
+**LIFESTYLE** — Personal development, mindset, wellness, and life optimization
+- Examples: motivational speeches, self-help content, productivity advice, habit building, transformation stories, morning routines (habit-focused), mental health content, meditation guides, philosophy videos, goal setting, relationship advice, fitness motivation stories
 
-- Gaming content: Tutorials/strategy guides often work as educational, entertainment gameplay as entertainment, game reviews as review
-- Fitness content: Structured workout tutorials often work as educational, motivation/transformation stories as lifestyle  
-- Cooking content: Recipe tutorials often work as educational, restaurant reviews as review, cooking vlogs as entertainment
-- Music content: Production tutorials often work as educational, concerts/performances as entertainment, pure music videos as other
-- Solo Q&A: Teaching/advice-focused often works as educational, personal life/mindset as lifestyle, casual chat as entertainment
+**OTHER** — Content that doesn't fit above categories or has insufficient data
+- Examples: music videos (pure music), ASMR videos, clip compilations without narrative, silent films, pure B-roll, corrupted transcripts, abstract/experimental videos, unedited live streams
 
-When content blends multiple types, choose based on what the creator's main intent seems to be and what would help users discover similar content.
+---
 
-STEP 2: EXTRACT BASED ON VIDEO TYPE
-Once you've identified the type, here are example extraction patterns to guide you. Adapt these based on what would help users find similar videos.
+# STEP 2: Extract Structured Information
 
-EXAMPLE EXTRACTION PATTERNS BY TYPE:
+Now that you know the content type, extract the following fields:
 
-1. ENTERTAINMENT
-   PRIORITY: entities (CRITICAL) > topics (LOW - sparse)
-   
-   TOPIC EXTRACTION GUIDANCE FOR ENTERTAINMENT:
-   Topics typically answer: "What type/genre/style of entertainment is this?"
-   Generally extract 1-3 broad categorization tags. Mix high-level (e.g., "comedy", "music", "gaming") with slightly more specific style/genre tags (e.g., "indie rock", "battle royale") when helpful for discovery. Using both levels together when possible (e.g., "music" + "indie rock") creates stronger search signals.
-   Entities carry most of the specificity, so keep topics focused on categorization rather than unique details. 
-   
-   Entertainment is diverse - here are some example patterns to guide you. There could be more, so decide accordingly what to extract:
-   
-   A) NARRATIVE CONTENT (sitcoms, series, short films, vlogs):
-      Typically helpful: Show/series name and main characters (entities) + broad genre/format (topics)
-      Less useful: Very specific plot elements or overly specific details that don't help categorize
-      
-      EXTRACT entities: Characters, show names, locations featured, channel names (2-5 typical)
-         Examples: "michael scott", "stranger things", "dwight schrute", "the office"
-      
-      EXTRACT topics: Usually broad genre/format/style tags (1-3 topics typical)
-         Examples: "comedy", "sitcom", "workplace comedy", "horror series", "travel vlog", "daily vlog"
-   
-   B) GAMING CONTENT (let's plays, gameplay, gaming commentary):
-      Typically helpful: Game title (entity) is primary + gameplay genre/style (topics) adds context
-      Less useful: Specific level names, mission numbers, or momentary gameplay events
+## 1. Summary (`short_summary`)
 
-      EXTRACT entities: Game titles, characters, streamers, gaming channels (1-3 typical)
-         Examples: "minecraft", "call of duty warzone", "pewdiepie", "valorant"
-      
-      EXTRACT topics: Often includes "gaming" + specific genre or gameplay style (1-3 topics typical)
-         Examples: "gaming", "survival horror", "battle royale", "speedrunning", "fighting games"
-   
-   C) REACTION & COMMENTARY (reactions, commentary videos):
-      Typically helpful: What's being reacted to (entity) + type of analysis if it's a defining focus
-      Less useful: Specific quotes, timestamps, or personal opinions expressed in the reaction
+- **2-4 sentences** maximum
+- Objective, factual description of what the video covers
+- Focus on the PRIMARY content, not minor tangents
+- No marketing language or subjective claims
 
-      EXTRACT entities: Content being reacted to, creators reacting, original creators (1-3 typical)
-         Examples: "game of thrones finale", "super bowl halftime show", "kendrick lamar"
-      
-      EXTRACT topics: Type/style of commentary when it defines the video (1-3 topics typical)
-         Examples: "reaction content", "music analysis", "film critique", "sports commentary", "movie review"
-   
-   D) PERFORMANCE & MUSIC (concerts, behind-the-scenes, artist content):
-      Typically helpful: Artist/song name (entity) + "music" + genre when relevant creates strong signals
-      Less useful: Specific lyrics, setlist order, or crowd reaction details
+**Example:** "This video demonstrates how to make traditional Italian carbonara pasta from scratch. The chef explains the importance of egg temperature, proper pasta water ratio, and timing. Common mistakes like adding cream or overcooking eggs are addressed with practical solutions."
 
-      EXTRACT entities: Artists, bands, song titles, venues, tour names (1-3 typical)
-         Examples: "taylor swift", "eras tour", "anti-hero song", "coachella", "billie eilish"
-      
-      EXTRACT topics: Often includes "music" + genre or performance type (1-3 topics typical)
-         Examples: "music", "pop music", "indie rock", "live concert", "acoustic performance", "jazz improvisation"
+---
 
-2. EDUCATIONAL
-   PRIORITY: topics (CRITICAL) > entities (MODERATE)
-   
-   TOPIC EXTRACTION GUIDANCE FOR EDUCATIONAL:
-   Topics are the primary search mechanism for educational content. Extract broader subject areas AND more specific topics when relevant.
-   Match topic specificity to the video's scope and essence: a general "Introduction to Programming" course gets broader topics like "programming" and "computer science", while a focused "CSS Flexbox Layout Guide" gets slightly more specific topics like "css", "web development", and "layout design".
-   Generally extract 2-5 topics. Focus on what's actually being taught, not just mentioned.
-   
-   Educational content focuses on teaching - here are some example patterns to guide you. There could be more, so decide accordingly what to extract:
-   
-   A) TECHNICAL TUTORIALS (coding, software, tech skills):
-      Typically helpful: Domains and concepts (topics) + specific tools/frameworks (entities)
-      Less useful: Specific code snippets, variable names, or function names from examples
-      Entity guidance: Focus on tools/frameworks that are central to what's being taught.
-      
-      EXTRACT entities: Languages, frameworks, tools, IDEs, libraries that are prominently featured in the video (2-5 typical)
-         Examples: "python", "react", "visual studio code", "pandas library", "postgresql", "figma"
-      
-      EXTRACT topics: Technical domains, programming concepts, skill areas (2-5 topics typical)
-         Examples: "programming", "web development", "javascript", "data science", "machine learning", "graphic design", "version control", "database management"
-   
-   B) CREATIVE & PRACTICAL SKILLS (art, cooking, fitness, DIY):
-      Typically helpful: Skill domains and techniques (topics) + tools/materials that are central to instruction (entities)
-      Less useful: Specific measurements, ingredient quantities, or step numbers
-      Entity guidance: Focus on tools/equipment that are prominently featured or central to what's being taught. For example: including "instant pot" is helpful in "Beginner's guide to Instant Pot cooking" since it is highly relevant to the video, while basic cookware in recipe videos is typically less useful.
-      
-      EXTRACT entities: Tools, equipment, materials, things that are prominently featured in the video (2-5 typical)
-         Examples: "air fryer", "instant pot", "watercolor paints", "procreate app", "resistance bands", "kettlebell"
-      
-      EXTRACT topics: Craft domains, techniques, skill categories (2-5 topics typical)
-         Examples: "cooking", "italian cuisine", "baking", "painting", "portrait drawing", "digital art", "fitness", "weight training", "yoga", "woodworking", "furniture building", "home renovation"
-   
-   C) ACADEMIC & PROFESSIONAL (courses, lectures, career advice):
-      Typically helpful: Academic/professional fields and concepts (topics) + frameworks/resources that are featured (entities)
-      Less useful: Specific lecture numbers, assignment names, or chapter titles
-      Entity guidance: Focus on frameworks, books, or platforms that are specifically being taught, reviewed, or recommended - not just casually mentioned in passing.
-      
-      EXTRACT entities: Frameworks, methodologies, books, certifications, platforms that are prominently featured in the video (2-5 typical)
-         Examples: "atomic habits book", "coursera", "aws certification"
-      
-      EXTRACT topics: Academic fields, professional domains, skill areas (2-5 topics typical)
-         Examples: "mathematics", "algebra", "physics", "biology", "world history", "economics", "business management", "leadership skills", "public speaking", "financial planning", "resume writing"
+## 2. Topics (`topics`)
 
-3. REVIEW
-   PRIORITY: entities (CRITICAL) > topics (MODERATE)
-   
-   TOPIC EXTRACTION GUIDANCE FOR REVIEW:
-   Topics typically capture product categories, features being evaluated, or use cases discussed - but entities (the actual products) are the primary search mechanism.
-   
-   Typically helpful: Specific products being reviewed (entities) + product categories and features (topics)
-   Less useful: Specific prices, timestamps, or minor spec details
+Main subjects, skills, concepts, or themes the video focuses on.
 
-   EXTRACT entities: Specific products with models, brands, software names that are being reviewed in the video (2-5 typical)
-      Examples: "iphone 15 pro max", "airpods pro gen 2", "notion app", "m3 macbook pro", "tesla model 3"
-   
-   EXTRACT topics: Product categories, features being evaluated, or use cases (2-5 topics typical)
-      Examples: "smartphone photography", "noise cancellation", "productivity software", "electric vehicles", "wireless earbuds", "budget laptops"
+**What to look for** (varies significantly by content type):
 
-4. INTERVIEW
-   PRIORITY: entities & topics (both CRITICAL)
-   
-   TOPIC EXTRACTION GUIDANCE FOR INTERVIEW:
-   Topics capture the major discussion themes and subject areas that get meaningful exploration during the conversation.
-   Balance broad themes with specific topics when they receive substantial discussion time. For example: a space podcast might extract both "space exploration" and "black holes" if black holes are discussed in depth.
-   Generally extract 2-5 topics based on the depth and breadth of conversation.
-   
-   Typically helpful: People and organizations involved (entities) + discussion themes and subject areas (topics)
-   Less useful: Specific anecdotes, personal stories, or tangential mentions
+### Entertainment Videos
+Topics answer "What type/genre/style of entertainment is this?" Extract broad categorization tags (1-3 typical).
 
-   EXTRACT entities: Full names of guests, hosts, companies, organizations, projects mentioned (2-5 typical)
-      Examples: "lex fridman", "sam altman", "openai", "y combinator", "tesla", "spacex"
-   
-   EXTRACT topics: Discussion themes - both broad subjects and specific subject areas explored (2-5 topics typical)
-      Examples: "artificial intelligence", "machine learning", "entrepreneurship", "venture capital", "space exploration", "black holes", "mental health", "cognitive behavioral therapy", "climate change", "solar energy"
+**Narrative Content** (sitcoms, series, tv shows, short films, vlogs):
+- Topics might cover: genre, format, style
+- Examples: "comedy", "sitcom", "horror series", "travel vlog"
+- **Do NOT extract**: Episode-specific plot points, character arcs, specific story beats
 
-5. NEWS
-   PRIORITY: entities (CRITICAL) > topics (MODERATE)
-   
-   TOPIC EXTRACTION GUIDANCE FOR NEWS:
-   Topics help categorize the type of news story and the broader issues being covered - think news categories and policy areas rather than specific incident details.
-   Balance story types with issue domains. For example: a banking collapse story might extract both "financial crisis" and "banking regulation" to capture different search angles.
-   Generally extract 2-5 topics based on the scope of coverage.
-   
-   Typically helpful: Specific people, places, organizations, and events (entities) + news categories and issue areas (topics)
-   Less useful: Specific dates, times, minor witnesses, or tangential details
+**Gaming Content** (let's plays, gameplay, commentary):
+- Topics might cover: "gaming" + specific genre or gameplay style
+- Examples: "gaming", "survival horror", "battle royale", "speedrunning", "fighting games"
+- **Do NOT extract**: Specific level names, mission numbers, gameplay events
 
-   EXTRACT entities: People, organizations, locations, specific events/incidents covered in the video (2-5 typical)
-      Examples: "silicon valley bank", "sam bankman-fried", "spacex starship", "chatgpt", "federal reserve"
-   
-   EXTRACT topics: News categories, issue areas, policy domains, phenomena covered (2-5 topics typical)
-      Examples: "financial crisis", "banking regulation", "cryptocurrency", "space exploration", "artificial intelligence", "tech industry", "nuclear safety", "climate policy", "healthcare reform", "election coverage"
+**Reaction & Commentary** (reactions, commentary videos):
+- Topics might cover: type of commentary/analysis when it's a defining focus
+- Examples: "reaction content", "music analysis", "film critique", "sports commentary"
+- **Do NOT extract**: Specific quotes, personal opinions, timestamp details
 
-6. LIFESTYLE
-   PRIORITY: entities & topics (both CRITICAL)
-   
-   TOPIC EXTRACTION GUIDANCE FOR LIFESTYLE:
-   Topics capture life domains, philosophical approaches, wellness categories, and self-improvement areas that help users find content in similar personal development niches.
-   Balance broad life areas with specific practices or frameworks that receive meaningful coverage. For example: a productivity video might extract both "productivity" and "time management" when time management is a key focus.
-   Generally extract 2-5 topics and 2-5 entities based on what's prominently featured.
-   
-   Lifestyle focuses on personal development - here are some example patterns to guide you. There could be more, so decide accordingly what to extract:
-   
-   A) MOTIVATIONAL & MINDSET (speeches, success stories):
-      Typically helpful: Speakers and programs featured (entities) + philosophical frameworks and life domains (topics)
-      Less useful: Specific daily routine timestamps, personal anecdotes, or motivational quotes
+**Performance & Music** (concerts, performances, artist content):
+- Topics might cover: "music" + genre or performance type
+- Examples: "music", "pop music", "indie rock", "live concert", "acoustic performance"
+- **Do NOT extract**: Specific lyrics, setlist order, crowd reactions
 
-      EXTRACT entities: Speakers, books referenced, specific programs/challenges featured in the video (2-5 typical)
-         Examples: "david goggins", "atomic habits book", "75 hard program", "tony robbins", "jocko willink"
-      
-      EXTRACT topics: Mental frameworks, philosophical approaches, life domains (2-5 topics typical)
-         Examples: "personal development", "mental toughness", "discipline", "stoicism", "habit formation", "morning routines", "goal setting", "resilience"
-   
-   B) WELLNESS & SELF-HELP (meditation, productivity, personal growth):
-      Typically helpful: Methods, teachers, and resources (entities) + wellness categories and optimization areas (topics)
-      Less useful: Specific meditation durations, routine step numbers, or app feature lists
+---
 
-      EXTRACT entities: Methods, teachers, books, apps, programs featured in the video (2-5 typical)
-         Examples: "wim hof method", "headspace app", "getting things done book", "tim ferriss", "james clear"
-      
-      EXTRACT topics: Wellness practices, productivity systems, self-optimization areas (2-5 topics typical)
-         Examples: "meditation", "mindfulness", "breathwork", "productivity", "time management", "habit building", "sleep optimization", "stress management", "digital minimalism"
+### Educational Videos
+Topics might cover what's being taught - skills, concepts, techniques (2-5 typical).
 
-7. OTHER
-   PRIORITY: Minimal extraction - use title/description only
-   
-   CONTENT GUIDANCE FOR OTHER:
-   This category is for content that doesn't fit other types or lacks sufficient information for proper extraction. Common examples include pure music videos, ASMR, ambient content, or videos with corrupted/missing transcripts.
-   Extract very minimally (1-3 items total) based only on title and description since the content itself doesn't provide extractable structure.
-   
-   Typically helpful: Basic categorization or artist/content identification when clearly evident
-   
-   EXTRACT entities: Only if clearly identifiable from title/description (0-3 typical)
-      Examples: "hans zimmer" (for a music video), "lofi girl" (for ambient streams)
-   
-   EXTRACT topics: Only basic genre or content type tags (0-3 typical)
-      Examples: "music video", "asmr", "ambient music", "nature sounds", "white noise"
-   
-   Note: Always mention in your reasoning that extraction is limited due to insufficient content structure.
+**Technical Tutorials** (coding, software, tech):
+- Examples: "programming", "web development", "machine learning", "database management"
 
-SCORING GUIDANCE:
-Rate prominence/importance (0.0-1.0) based on: "Would someone searching for X want to find THIS video?"
-  
-  0.8-1.0: CENTRAL to the video's value/identity
-    Main character in sitcom, primary tool in tutorial, product being reviewed, interview guest
-  
-  0.5-0.7: SIGNIFICANT but not the main draw
-    Recurring side character, important sub-topic, competing product mentioned, co-host
-  
-  0.3-0.4: MEANINGFUL but brief
-    One-time appearance, example to illustrate concept, background location, referenced work
-  
-  Below 0.3: DON'T EXTRACT - creates noise
-    Passing mentions, generic tools, meta-references
+**Creative & Practical Skills** (art, cooking, fitness, DIY):
+- Examples: "cooking", "italian cuisine", "baking", "digital art", "fitness", "woodworking"
 
-CANONICAL NAMING:
-- Use widely recognized forms: "react" not "React.js"
-- People: "firstname lastname" lowercase: "elon musk"
-- Products: include identifiers: "iphone 15 pro" not "iphone"
-- Concepts: industry-standard terms: "machine learning" not "ML"
-- De-duplicate: keep one canonical form per concept
+**Academic & Professional** (courses, lectures, career advice):
+- Examples: "mathematics", "physics", "economics", "leadership skills", "financial planning"
 
-ENTITY TYPE CLASSIFICATION:
-For better semantic search, classify each entity by type. Here are some examples (there could be more, use your judgment):
+---
 
-- person: individuals, celebrities, hosts, guests, speakers
-  Examples: "elon musk", "joe rogan", "serena williams"
+### Review Videos
+Topics might cover product categories, features being evaluated, use cases.
+- Examples: "smartphone photography", "noise cancellation", "battery performance", "productivity software"
 
-- product: specific products, gadgets, devices with models
-  Examples: "iphone 15 pro", "airpods pro", "macbook air"
+---
 
-- tool: software, apps, platforms, instruments, equipment
-  Examples: "photoshop", "excel", "github", "blender"
+### Interview Videos
+Topics might cover discussion themes and subject areas explored (2-5 typical).
+- Examples: "artificial intelligence", "entrepreneurship", "climate policy", "mental health"
 
-- framework: programming frameworks, methodologies, systems, APIs
-  Examples: "react", "django", "tensorflow", "kubernetes"
+---
 
-- organization: companies, institutions, groups, channels
-  Examples: "google", "nasa", "united nations", "red cross"
+### News Videos
+Topics might cover news categories, issue areas, policy domains (2-5 typical).
+- Examples: "financial crisis", "banking regulation", "election coverage", "climate policy"
 
-- location: places, venues, cities, landmarks, geographical locations
-  Examples: "new york city", "grand canyon", "eiffel tower", "tokyo"
+---
 
-- book: books, publications, written works
-  Examples: "sapiens", "thinking fast and slow", "the lean startup"
+### Lifestyle Videos
+Topics might cover life domains, wellness categories, philosophical approaches (2-5 typical).
 
-- method: specific techniques, programs, challenges, named approaches
-  Examples: "pomodoro technique", "intermittent fasting", "agile methodology"
+**Motivational & Mindset**:
+- Examples: "personal development", "mental toughness", "discipline", "habit formation"
 
-- show: TV shows, series, web series, programs
-  Examples: "breaking bad", "the office", "stranger things"
+**Wellness & Self-Help**:
+- Examples: "meditation", "mindfulness", "productivity", "time management", "stress management"
 
-- game: video games, board games
-  Examples: "minecraft", "fortnite", "chess", "pokemon"
+---
 
-- song: songs, albums, music tracks
-  Examples: "bohemian rhapsody", "thriller album", "shape of you"
+**Guidelines:**
+- Focus on **what the video is about** at a categorical level, not episode-specific details
+- Use specific terms when they help categorization: "gradient descent" not just "AI"
+- Normalize names: "machine learning" not "Machine Learning 101"
+- **prominence** (0.0-1.0): Share of video focus
+  - 0.8-1.0: Primary/central topic
+  - 0.5-0.7: Significant secondary topic
+  - 0.2-0.4: Minor but meaningful topic
+  - <0.2: Barely covered, omit
 
-- event: specific events, tours, conferences, incidents, launches
-  Examples: "world cup 2022", "apple keynote", "olympics", "tech crunch disrupt"
+**Format:**
+- `name`: Display-friendly format ("Pasta Making")
+- `canonical_name`: lowercase, normalized, no special chars ("pasta making")
 
-- other: for entities that are not specific enough or you are not sure about
+**Examples:**
+```json
+{{"name": "Sourdough Baking", "canonical_name": "sourdough baking", "prominence": 0.9}}
+{{"name": "Survival Horror", "canonical_name": "survival horror", "prominence": 0.8}}
+{{"name": "Battery Performance", "canonical_name": "battery performance", "prominence": 0.75}}
+{{"name": "Climate Policy", "canonical_name": "climate policy", "prominence": 0.85}}
+{{"name": "Meditation Techniques", "canonical_name": "meditation techniques", "prominence": 0.7}}
+```
 
-OUTPUT FORMAT (JSON only, no extra text):
+---
+
+## 3. Entities (`entities`)
+
+Entities are **specific instances central to the video** - such as particular people, organizations, products, places, theories/frameworks, events, or key concepts discussed.
+
+**What you might find** (just examples to help guide your thinking):
+- **Educational videos** often include tools, frameworks, instructors, historical figures, key things being worked with
+- **Entertainment videos** might reference actors, characters, shows/movies, creators
+- **Review videos** typically feature products/services being evaluated, competitor brands
+- **Interview videos** usually include guests, their companies/projects, people they reference
+- **News videos** commonly cover people involved in events, organizations being investigated
+- **Lifestyle videos** might mention thought leaders, books/methods referenced, wellness brands
+
+**importance** (0.0-1.0): How central is this entity to the video?
+- 0.8-1.0: Main subject/focus of video
+- 0.5-0.7: Frequently discussed, significant role
+- 0.3-0.4: Mentioned multiple times with context
+- <0.3: Brief mention, omit
+
+**entity_type**: `person`, `organization`, `product`, `place`, `concept`, `event`, `other`
+
+**Format:**
+```json
+{{"name": "Gordon Ramsay", "canonical_name": "gordon ramsay", "importance": 0.9, "entity_type": "person"}}
+{{"name": "iPhone 15", "canonical_name": "iphone 15", "importance": 0.7, "entity_type": "product"}}
+{{"name": "Paris", "canonical_name": "paris", "importance": 0.5, "entity_type": "place"}}
+```
+
+---
+
+## 4. Tags (`tags`)
+
+Searchable labels derived from topics and entities.
+
+### A) From Topics (Generalize into broader categories)
+- "gradient descent" → `machine-learning`, `optimization`, `math`
+- "pasta making" → `cooking`, `italian-cuisine`, `culinary-skills`
+- "mindfulness meditation" → `meditation`, `mindfulness`, `mental-health`, `wellness`
+
+### B) From Entities (Extract categorical tags)
+- "Gordon Ramsay" → `chef`, `celebrity`, `british`
+- "TensorFlow" → `google`, `deep-learning`, `python`
+- "iPhone 15" → `apple`, `smartphone`, `ios`
+
+**Guidelines:**
+- Use **lowercase, hyphenated** format (`machine-learning`, not `Machine Learning`)
+- Be specific but searchable: `italian-cuisine` > `food` (but include both)
+- Aim for **8-15 tags** total
+- Balance specificity with discoverability
+- **weight** (0.0-1.0): Relevance/confidence
+  - 0.8-1.0: Core, highly relevant
+  - 0.5-0.7: Secondary, useful
+  - 0.3-0.4: Tertiary, might help discovery
+  - <0.3: Omit
+
+**Format:**
+```json
+{{"tag": "machine-learning", "weight": 0.95}}
+{{"tag": "cooking", "weight": 0.9}}
+{{"tag": "smartphone", "weight": 0.85}}
+```
+
+---
+
+## 5. Language (`language`)
+
+Detect the primary language of the transcript.
+
+**Format:** ISO 639-1 code (`en`, `es`, `fr`, `de`, `ja`, `zh`, `pt`, `ru`, etc.)
+
+---
+
+## Output Format
+
+Return **valid JSON only** (no markdown, no explanation).
+
+**IMPORTANT:** Output `metadata` FIRST since content_type guides all other extraction.
+```json
 {{
-  "content_analysis": {{
-    "primary_type": "entertainment|educational|review|interview|news|lifestyle|other",
-    "secondary_type": "optional subtype or blend description",
-    "reasoning": "1-2 sentences: WHY you classified it this way AND what extraction strategy you'll use"
+  "metadata": {{
+    "content_type": "educational|entertainment|review|interview|news|lifestyle|other",
+    "language": "en"
   }},
   "short_summary": "2-4 sentences objectively describing what this video covers and its primary focus",
   "topics": [
-    {{"name": "Display Name", "canonical_name": "lowercase normalized", "prominence": 0.0-1.0}}
+    {{"name": "Display Name", "canonical_name": "lowercase normalized", "prominence": 0.0}}
   ],
   "entities": [
-    {{"name": "Display Name", "canonical_name": "lowercase normalized", "importance": 0.0-1.0, "entity_type": ""}}
+    {{"name": "Display Name", "canonical_name": "lowercase normalized", "importance": 0.0, "entity_type": "person|organization|product|place|concept|event|other"}}
   ],
-  "metadata": {{
-    "content_type": "entertainment|educational|review|interview|news|lifestyle|other",
-    "language": "detected language code"
-  }}
+  "tags": [
+    {{"tag": "lowercase-hyphenated", "weight": 0.0}}
+  ]
 }}
+```
 
-CRITICAL RULES (MOST IMPORTANT):
-- Follow PRIORITY guidance for each type - extract more of what matters most
-- Every extraction must help find similar videos
-- When in doubt, extract LESS not more - noise is worse than missing info
-- When extracting entities, focus on what's prominently featured and central to the video
-- When extracting topics, think about search behavior: use common terms that people would actually search for to find this type of content
-- Topics should be one level more general than the video's specific content - if a video teaches "sourdough starter maintenance," extract "bread baking" or "baking" as topics
-- Higher-level, broader topics should receive higher prominence scores than narrow, specific topics
-- Focus on what helps discovery and grouping, not specific details
-- JSON only response, no markdown, no explanations outside JSON
+---
 
-BEFORE YOU START:
-Your goal is to extract ONLY information that helps users discover similar or related videos. First understand the essence of the video, then extract only the absolutely necessary information that reflects general high level topics and important entities.
+## Example Output
+
+**Input:** Video about making sourdough bread, featuring professional baker Sarah Johnson, discussing fermentation science and troubleshooting common issues.
+```json
+{{
+  "metadata": {{
+    "content_type": "educational",
+    "language": "en"
+  }},
+  "short_summary": "Professional baker Sarah Johnson demonstrates the complete process of making sourdough bread from starter to final bake. The video covers fermentation science, dough hydration ratios, and shaping techniques.",
+  "topics": [
+    {{"name": "Sourdough Baking", "canonical_name": "sourdough baking", "prominence": 0.95}},
+    {{"name": "Fermentation Science", "canonical_name": "fermentation science", "prominence": 0.6}},
+    {{"name": "Bread Shaping", "canonical_name": "bread shaping", "prominence": 0.6}}
+  ],
+  "entities": [
+    {{"name": "Sarah Johnson", "canonical_name": "sarah johnson", "importance": 0.8, "entity_type": "person"}},
+    {{"name": "Sourdough Starter", "canonical_name": "sourdough starter", "importance": 0.5, "entity_type": "concept"}},
+    {{"name": "Dough", "canonical_name": "dough", "importance": 0.6, "entity_type": "concept"}}
+  ],
+  "tags": [
+    {{"tag": "baking", "weight": 0.95}},
+    {{"tag": "sourdough", "weight": 0.95}},
+    {{"tag": "bread", "weight": 0.9}},
+    {{"tag": "fermentation", "weight": 0.7}},
+    {{"tag": "cooking", "weight": 0.7}},
+    {{"tag": "culinary-skills", "weight": 0.7}},
+    {{"tag": "food-science", "weight": 0.6}}
+  ]
+}}
+```
+
+---
+
+## Now Process This Video
+
+**Title:** {title.strip()}
+
+**Description:** {description.strip()}
+
+**Transcript:**
+{transcript_text.strip()}
+
+**End of Transcript**
+
+**Remember:**
+1. First, determine the content_type
+2. Then extract topics, entities, tags, and summary with that context in mind
+3. Return only the JSON output
 """
