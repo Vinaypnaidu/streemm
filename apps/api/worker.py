@@ -721,7 +721,7 @@ def process_video(video_id: str, reason: str) -> None:
 
         # Graph sync
         try:
-            from models import Topic, Entity, VideoTopic, VideoEntity
+            from models import Topic, Entity, Tag, VideoTopic, VideoEntity, VideoTag
 
             vid_uuid = uuid.UUID(video_id)
 
@@ -735,6 +735,12 @@ def process_video(video_id: str, reason: str) -> None:
                 db.query(VideoEntity, Entity)
                 .join(Entity, VideoEntity.entity_id == Entity.id)
                 .filter(VideoEntity.video_id == vid_uuid)
+                .all()
+            )
+            gt_rows = (
+                db.query(VideoTag, Tag)
+                .join(Tag, VideoTag.tag_id == Tag.id)
+                .filter(VideoTag.video_id == vid_uuid)
                 .all()
             )
 
@@ -754,8 +760,16 @@ def process_video(video_id: str, reason: str) -> None:
                 }
                 for e in et_rows
             ]
+            g_tags = [
+                {
+                    "id": str(g[1].id),
+                    "canonical_name": (g[1].canonical_name or "").strip().lower(),
+                    "weight": float(g[0].weight),
+                }
+                for g in gt_rows
+            ]
 
-            sync_video(video_id, g_topics, g_entities)
+            sync_video(video_id, g_topics, g_entities, g_tags)
         except Exception:
             log.exception("graph_sync_failed")
 

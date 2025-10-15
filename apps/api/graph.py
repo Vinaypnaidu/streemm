@@ -51,6 +51,7 @@ def ensure_constraints() -> None:
         "CREATE CONSTRAINT video_id_unique IF NOT EXISTS FOR (v:Video) REQUIRE v.id IS UNIQUE",
         "CREATE CONSTRAINT topic_id_unique IF NOT EXISTS FOR (t:Topic) REQUIRE t.id IS UNIQUE",
         "CREATE CONSTRAINT entity_id_unique IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE",
+        "CREATE CONSTRAINT tag_id_unique IF NOT EXISTS FOR (g:Tag) REQUIRE g.id IS UNIQUE",
         # # Required canonical_name properties; disabled for now as they need enterprise version
         # "CREATE CONSTRAINT topic_canonical_required IF NOT EXISTS FOR (t:Topic) REQUIRE t.canonical_name IS NOT NULL",
         # "CREATE CONSTRAINT entity_canonical_required IF NOT EXISTS FOR (e:Entity) REQUIRE e.canonical_name IS NOT NULL",
@@ -95,6 +96,19 @@ def _merge_entity(sess, entity_id: str, canonical_name: str) -> None:
     )
 
 
+def _merge_tag(sess, tag_id: str, canonical_name: str) -> None:
+    # Keep canonical_name if present; set on create or if missing
+    sess.run(
+        """
+        MERGE (g:Tag {id: $id})
+        ON CREATE SET g.canonical_name = $cn
+        SET g.canonical_name = coalesce(g.canonical_name, $cn)
+        """,
+        id=tag_id,
+        cn=canonical_name,
+    )
+
+
 def _merge_has_topic(sess, video_id: str, topic_id: str, prominence: float) -> None:
     sess.run(
         """
@@ -123,10 +137,25 @@ def _merge_has_entity(sess, video_id: str, entity_id: str, importance: float) ->
     )
 
 
+def _merge_has_tag(sess, video_id: str, tag_id: str, weight: float) -> None:
+    sess.run(
+        """
+        MATCH (v:Video {id: $vid})
+        MATCH (g:Tag {id: $gid})
+        MERGE (v)-[r:HAS_TAG]->(g)
+        SET r.weight = $w
+        """,
+        vid=video_id,
+        gid=tag_id,
+        w=float(weight),
+    )
+
+
 def sync_video(
     video_id: str,
-    topics: Iterable[Dict[str, Any]],
-    entities: Iterable[Dict[str, Any]],
+    topics: Iterable[Dict[str, Any]] | None,
+    entities: Iterable[Dict[str, Any]] | None,
+    tags: Iterable[Dict[str, Any]] | None = None,
 ) -> None:
     """
     topics: items with {id, canonical_name, prominence}
@@ -140,11 +169,13 @@ def sync_video(
 
     ensure_constraints()
 
-    p_th = float(getattr(settings, "neo4j_prominence_insert_th", 0.50))
-    w_th = float(getattr(settings, "neo4j_importance_insert_th", 0.50))
+    p_th = float(getattr(settings, "neo4j_prominence_insert_th", 0.70))
+    w_th = float(getattr(settings, "neo4j_importance_insert_th", 0.70))
+    g_th = float(getattr(settings, "neo4j_tag_weight_insert_th", 0.70))
 
     topics = list(topics or [])
     entities = list(entities or [])
+    tags = list(tags or [])
 
     # Filter by confidence thresholds
     t_keep = [
@@ -156,6 +187,11 @@ def sync_video(
         e for e in entities
         if float(e.get("importance", 0.0)) >= w_th
            and e.get("id") and (e.get("canonical_name") or "").strip()
+    ]
+    g_keep = [
+        g for g in tags
+        if float(g.get("weight", 0.0)) >= g_th
+           and g.get("id") and (g.get("canonical_name") or "").strip()
     ]
 
     try:
@@ -170,11 +206,16 @@ def sync_video(
                 _merge_entity(sess, e["id"], (e["canonical_name"] or "").strip().lower())
                 _merge_has_entity(sess, video_id, e["id"], float(e["importance"]))
 
+            for g in g_keep:
+                _merge_tag(sess, g["id"], (g["canonical_name"] or "").strip().lower())
+                _merge_has_tag(sess, video_id, g["id"], float(g["weight"]))
+
         log.info(
-            "graph_sync_ok video=%s topics=%d entities=%d skipped_topics=%d skipped_entities=%d",
-            video_id, len(t_keep), len(e_keep),
+            "graph_sync_ok video=%s topics=%d entities=%d tags=%d skipped_topics=%d skipped_entities=%d skipped_tags=%d",
+            video_id, len(t_keep), len(e_keep), len(g_keep),
             len(topics) - len(t_keep),
             len(entities) - len(e_keep),
+            len(tags) - len(g_keep),
         )
     except Exception as exc:
         log.warning("graph_sync_failed video=%s error=%s", video_id, exc)
