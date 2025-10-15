@@ -19,9 +19,13 @@
 *Note:* `category` is **index-only** (LLM-generated) → embedding + OpenSearch only.
 
 
-**Tags —** searchable labels derived from topics/entities/attributes; user-facing indexing sugar. `weight` is confidence/usefulness.
+**Tags —** searchable labels derived from topics/entities/attributes; persisted as first-class `Tag` with stable ID for graph, and linked per video with a weight.
 
 ```json
+// Persisted Tag (Postgres)
+{ "id": "uuid", "name": "string", "canonical_name": "string" }
+
+// Per-video link
 { "tag": "string", "weight": 0.0 }
 ```
 
@@ -77,17 +81,19 @@ Metadata: content_type={tutorial|...}
 * **video_topics**: `video_id FK`, `topic_id FK`, `prominence NUMERIC(3,2)`, `UNIQUE(video_id, topic_id)`
 * **entities**: `id PK`, `name`, `canonical_name UNIQUE`
 * **video_entities**: `video_id FK`, `entity_id FK`, `importance NUMERIC(3,2)`, `UNIQUE(video_id, entity_id)`
-* **video_tags**: `video_id FK`, `tag TEXT`, `weight NUMERIC(3,2)`, `UNIQUE(video_id, tag)`
+* **tags**: `id PK`, `name`, `canonical_name UNIQUE`
+* **video_tags**: `video_id FK`, `tag_id FK`, `weight NUMERIC(3,2)`, `UNIQUE(video_id, tag_id)`
 
 **Indexes (lean, practical)**
 
 * `topics(canonical_name)` **UNIQUE** (btree)
 * `entities(canonical_name)` **UNIQUE** (btree)
+* `tags(canonical_name)` **UNIQUE** (btree)
 * `video_topics(video_id, topic_id)` **UNIQUE** and `video_topics(topic_id, video_id)` (btree)
 * `video_entities(video_id, entity_id)` **UNIQUE** and `video_entities(entity_id, video_id)` (btree)
-* `video_tags(video_id, tag)` **UNIQUE** and `video_tags(tag)` (btree)
+* `video_tags(video_id, tag_id)` **UNIQUE** and `video_tags(tag_id, video_id)` (btree)
 
-* Optional: `video_topics(topic_id, prominence)`, `video_entities(entity_id, importance)`, `videos(content_type)`, `videos(language)`, and case-insensitive tags via `CITEXT` or `UNIQUE (video_id, lower(tag))`
+* Optional: `video_topics(topic_id, prominence)`, `video_entities(entity_id, importance)`, `video_tags(tag_id, weight)`, `videos(content_type)`, `videos(language)`
 
 ### 3.2 OpenSearch (per-video doc; denormalized; kNN enabled)
 
@@ -127,17 +133,19 @@ Metadata: content_type={tutorial|...}
 * `Video { id: UUID }`
 * `Topic { id: UUID, canonical_name: String }`
 * `Entity { id: UUID, canonical_name: String }`
+* `Tag { id: UUID, canonical_name: String }`
 
 **Relationships (properties)**
 
 * `(:Video)-[:HAS_TOPIC { prominence: Float }]->(:Topic)`
 * `(:Video)-[:HAS_ENTITY { importance: Float }]->(:Entity)`
+* `(:Video)-[:HAS_TAG { weight: Float }]->(:Tag)`
 
 **Constraints / required properties**
 
-* Uniqueness on `Video.id`, `Topic.id`, `Entity.id`
-* Property existence: `Topic.canonical_name` **required**, `Entity.canonical_name` **required**
-* Property existence: `HAS_TOPIC.prominence` **required**, `HAS_ENTITY.importance` **required**
+* Uniqueness on `Video.id`, `Topic.id`, `Entity.id`, `Tag.id`
+* Property existence: `Topic.canonical_name` **required**, `Entity.canonical_name` **required**, `Tag.canonical_name` **required**
+* Property existence: `HAS_TOPIC.prominence` **required**, `HAS_ENTITY.importance` **required**, `HAS_TAG.weight` **required**
 * *(No extra indexes on `canonical_name`.)*
 
 ---
@@ -149,12 +157,21 @@ Metadata: content_type={tutorial|...}
    `video_summary.short_summary`;
    `topics` + `video_topics(prominence)` *(no `category`)*;
    `entities` + `video_entities(importance)` *(no `type`)*;
-   `video_tags(tag,weight)`; update `videos(content_type|duration_s|language)` as needed.
+   `tags` + `video_tags(tag_id,weight)`; update `videos(content_type|duration_s|language)` as needed.
 3. **Sync to Neo4j:** upsert `Video/Topic/Entity` nodes and `HAS_TOPIC/HAS_ENTITY` edges (weights mandatory).
 4. **Build embedding text** using the template (include **description + summary**, and index-only `type`/`category`).
 5. **Embed** → single video-level vector.
 6. **Index in OpenSearch** (upsert per video): `id`, `title`, `description`, `content_type`, `duration_s`, `language`,
    `entities[]` *(incl. type)*, `topics[]` *(incl. category)*, `tags[]`, `embedding`.
+### Graph thresholds (ingestion)
+
+Edges are inserted only when weights meet thresholds (configurable via settings):
+
+- `HAS_TOPIC.prominence >= 0.70` (`neo4j_prominence_insert_th`)
+- `HAS_ENTITY.importance >= 0.70` (`neo4j_importance_insert_th`)
+- `HAS_TAG.weight >= 0.70` (`neo4j_tag_weight_insert_th`)
+
+Orphan pruning removes `Topic`/`Entity`/`Tag` nodes with no incoming edges when a `Video` is deleted.
    *(Summary is **not** indexed in OS; they’re embedding-only + UI.)*
 
 ---

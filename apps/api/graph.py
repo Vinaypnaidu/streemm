@@ -252,6 +252,14 @@ def delete_video(video_id: str, *, prune_orphans: bool = True) -> None:
                     DETACH DELETE e
                     """
                 )
+                # Remove Tags with no incoming HAS_TAG from any Video
+                sess.run(
+                    """
+                    MATCH (g:Tag)
+                    WHERE NOT EXISTS( ()-[:HAS_TAG]->(g) )
+                    DETACH DELETE g
+                    """
+                )
         log.info("graph_delete_ok video=%s", video_id)
     except Exception as exc:
         log.warning("graph_delete_failed video=%s error=%s", video_id, exc)
