@@ -229,8 +229,8 @@ Return **valid JSON only** (no markdown, no explanation).
   ],
   "entities": [
     {{"name": "Sarah Johnson", "canonical_name": "sarah johnson", "importance": 0.8, "entity_type": "person"}},
-    {{"name": "Sourdough Starter", "canonical_name": "sourdough starter", "importance": 0.5, "entity_type": "concept"}},
-    {{"name": "Dough", "canonical_name": "dough", "importance": 0.65, "entity_type": "concept"}}
+    {{"name": "Sourdough Starter", "canonical_name": "sourdough starter", "importance": 0.5, "entity_type": "ingredient"}},
+    {{"name": "Dough", "canonical_name": "dough", "importance": 0.65, "entity_type": "ingredient"}}
   ],
   "tags": [
     {{"tag": "baking", "weight": 0.95}},
