@@ -7,8 +7,8 @@ def _build_prompt(title: str, description: str, transcript_text: str) -> str:
 
 **STEP 2:** Based on the content type, extract:
 - **Summary** — objective 2-4 sentence description
-- **Topics** — main subjects covered
-- **Entities** — named things mentioned (people, orgs, products, places, etc.)
+- **Topics** — what the video is about: key subjects (skills, concepts, techniques, etc.) that receive substantial focus
+- **Entities** — specific instances and key things central to the video (people, organizations, products, concepts, events etc.)
 - **Tags** — searchable labels derived from topics, entities, and video nature
 
 ---
@@ -46,6 +46,15 @@ Classify the video's **PRIMARY purpose** first. This determines how you approach
 
 Now that you know the content type, extract the following fields:
 
+## CANONICAL NAMING GUIDELINES:
+- Use widely recognized forms: "react" not "React.js"
+- People: "firstname lastname" lowercase: "elon musk"
+- Products: include identifiers: "iphone 15 pro" not "iphone"
+- Concepts: industry-standard terms: "machine learning" not "ML"
+- De-duplicate: keep one canonical form per concept
+
+---
+
 ## 1. Summary (`short_summary`)
 
 - **2-4 sentences** maximum
@@ -59,15 +68,15 @@ Now that you know the content type, extract the following fields:
 
 ## 2. Topics (`topics`)
 
-Main subject areas, skills, and concepts the video focuses on.
+Main subjects, skills, and concepts the video focuses on. Extract moderately specific topics that receive substantial coverage - not overly specific details or tangential mentions.
 
 **What to look for** (these are just examples to guide your thinking):
-- **Educational videos** often include skills taught, concepts explained, techniques demonstrated
-- **Entertainment videos** could discuss/cover various subjects - extract selectively based on prominence. Episodic plots and specific details are generally not useful - typically extract 1-3 topics max if highly prominent
-- **Review videos** typically focus on product categories, features being evaluated, comparison points
-- **Interview videos** usually center on subjects discussed, areas of expertise
-- **News videos** commonly cover issues investigated, events covered, policy areas
-- **Lifestyle videos** often explore personal development areas, wellness practices, mindset concepts
+- **Educational videos** often include skills taught, concepts explained, techniques demonstrated etc.
+- **Entertainment videos** might discuss various subjects - extract sparingly, only topics that receive substantial focus
+- **Review videos** typically focus on product categories, features being evaluated, comparison points etc.
+- **Interview videos** usually center on subjects discussed, areas of expertise etc.
+- **News videos** commonly cover issues investigated, events covered, policy areas etc.
+- **Lifestyle videos** often explore personal development areas, wellness practices, mindset concepts, etc.
 
 **Guidelines:**
 - Focus on **what the video is about**, not just passing mentions
@@ -85,15 +94,12 @@ Main subject areas, skills, and concepts the video focuses on.
 
 **Examples:**
 ```json
-{{"name": "Sourdough Baking", "canonical_name": "sourdough baking", "prominence": 0.9}}
-{{"name": "Battery Performance", "canonical_name": "battery performance", "prominence": 0.75}}
-{{"name": "Climate Policy", "canonical_name": "climate policy", "prominence": 0.85}}
-{{"name": "Meditation Techniques", "canonical_name": "meditation techniques", "prominence": 0.7}}
-{{"name": "CSS Grid Layout", "canonical_name": "css grid layout", "prominence": 0.7}}
-{{"name": "Pasta Techniques", "canonical_name": "pasta techniques", "prominence": 0.65}}
-{{"name": "Smartphone Photography", "canonical_name": "smartphone photography", "prominence": 0.8}}
-{{"name": "Machine Learning", "canonical_name": "machine learning", "prominence": 0.8}}
-{{"name": "Gradient Descent", "canonical_name": "gradient descent", "prominence": 0.8}}
+{{"name": "Machine Learning", "canonical_name": "machine learning", "prominence": 0.9}}
+{{"name": "Gradient Descent", "canonical_name": "gradient descent", "prominence": 0.85}}
+{{"name": "CSS Grid Layout", "canonical_name": "css grid layout", "prominence": 0.8}}
+{{"name": "Pasta Making", "canonical_name": "pasta making", "prominence": 0.85}}
+{{"name": "Low Light Photography", "canonical_name": "low light photography", "prominence": 0.8}}
+{{"name": "Tokyo Street Food", "canonical_name": "tokyo street food", "prominence": 0.75}}
 ```
 
 ---
@@ -206,15 +212,6 @@ Return **valid JSON only** (no markdown, no explanation).
 
 ---
 
-## CANONICAL NAMING:
-- Use widely recognized forms: "react" not "React.js"
-- People: "firstname lastname" lowercase: "elon musk"
-- Products: include identifiers: "iphone 15 pro" not "iphone"
-- Concepts: industry-standard terms: "machine learning" not "ML"
-- De-duplicate: keep one canonical form per concept
-
----
-
 ## Example Output
 
 **Input:** Video about making sourdough bread, featuring professional baker Sarah Johnson, discussing fermentation science and troubleshooting common issues.
@@ -233,7 +230,7 @@ Return **valid JSON only** (no markdown, no explanation).
   "entities": [
     {{"name": "Sarah Johnson", "canonical_name": "sarah johnson", "importance": 0.8, "entity_type": "person"}},
     {{"name": "Sourdough Starter", "canonical_name": "sourdough starter", "importance": 0.5, "entity_type": "concept"}},
-    {{"name": "Dough", "canonical_name": "dough", "importance": 0.6, "entity_type": "concept"}}
+    {{"name": "Dough", "canonical_name": "dough", "importance": 0.65, "entity_type": "concept"}}
   ],
   "tags": [
     {{"tag": "baking", "weight": 0.95}},
@@ -242,7 +239,6 @@ Return **valid JSON only** (no markdown, no explanation).
     {{"tag": "fermentation", "weight": 0.7}},
     {{"tag": "cooking", "weight": 0.75}},
     {{"tag": "culinary-skills", "weight": 0.75}},
-    {{"tag": "tutorial", "weight": 0.6}}
   ]
 }}
 ```
