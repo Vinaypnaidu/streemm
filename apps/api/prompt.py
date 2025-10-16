@@ -139,24 +139,49 @@ Entities are **specific instances central to the video** - such as particular pe
 
 Searchable labels derived from topics, entities, and the video's overall content nature.
 
-**Create a rich, multi-faceted tag set:** Think about how users might discover this content from different angles - include domain/field tags, format/style tags, and key characteristics. Balance broad discoverability with specific detail.
+**IMPORTANT: Generalize up from topics and entities** - don't just convert their names to tags. Extract the **broader domains, fields, and categories** they belong to, then add tags that describe the video's format and presentation style. Think about what terms users would naturally search for to discover content like this.
 
-### A) From Topics (Generalize into broader categories)
-- "gradient descent" → `machine-learning`, `optimization`, `math`
-- "pasta making" → `cooking`, `italian-cuisine`, `culinary-skills`
-- "mindfulness meditation" → `meditation`, `mindfulness`, `mental-health`, `wellness`
+**For entertainment content:** Do not create tags based on topics that cover episodic plots or specific details.
 
-### B) From Entities (Extract categorical tags)
-- "Gordon Ramsay" → `chef`, `celebrity`, `british`
-- "TensorFlow" → `google`, `deep-learning`, `python`
-- "iPhone 15" → `apple`, `smartphone`, `ios`
+**Quality check:** Ask yourself: "Does this tag help users discover content like this?" Remove tags that don't pass this test. Broad tags are totally fine - irrelevant tags are not.
 
-### C) From Video Nature (High-level categorization of what this video is)
-Consider the video's format, type, and high-level categorization:
-- Entertainment examples: `tv-show`, `sitcom`, `comedy`, `gaming`, `music-video`, `vlog`, `travel-vlog`
-- Educational examples: `tutorial`, `course`, `how-to`, `explainer`
-- Review examples: `tech-review`, `product-review`, `comparison`
-- Other examples: `podcast`, `interview`, `documentary`, `news`
+### A) From Topics (Generalize into broader categories, NOT just repeat topic names)
+Topics describe what the video is about - generalize them into **searchable domain/field tags**. Do NOT create tags that are identical to topic names.
+
+Examples:
+- "Gradient Descent" topic → `machine-learning`, `optimization`, `algorithms`
+- "Convolutional Neural Networks" topic → `deep-learning`, `computer-vision`, `ai`
+- "Pasta Making" topic → `cooking`, `italian-cuisine`, `food`
+- "Sourdough Baking" topic → `baking`, `bread`, `cooking`
+- "CSS Grid Layout" topic → `css`, `web-design`, `frontend`
+- "HIIT Workouts" topic → `fitness`, `exercise`, `cardio`
+- "Stock Market Analysis" topic → `finance`, `investing`, `trading`
+
+**Think:** What broader fields/domains does this topic belong to? Use obvious, natural generalizations.
+
+### B) From Entities (Extract broader categorical/attribute tags, NOT entity names)
+Extract **obvious categories and attributes** that describe the entities - do NOT simply convert entity names to tags.
+
+Examples:
+- "Gordon Ramsay" → `chef`, `celebrity`, `british` (NOT `gordon-ramsay`)
+- "TensorFlow" → `google`, `machine-learning`, `python` (NOT `tensorflow`)
+- "The Office" → `sitcom`, `mockumentary`, `nbc` (NOT `the-office`)
+- "iPhone 15" → `apple`, `smartphone`, `ios` (NOT `iphone-15`)
+- "React" → `javascript`, `facebook`, `web-development` (NOT `react`)
+- "World War II" → `war`, `history`, `1940s` (NOT `world-war-ii`)
+
+**Ask yourself:** What type/category is this entity? Who made it? What domain does it belong to?
+
+### C) From Video's Overall Content and Nature (Format, type, and presentation style)
+Describe **how the content is presented** - the video's format and structural characteristics, not what it's about.
+
+Examples by content type:
+- Entertainment: `tv-show`, `sitcom`, `comedy`, `drama`, `gaming`, `music-video`, `vlog`, `travel-vlog`, `compilation`, `best-of`, `highlights`, `tv-clip`, `mockumentary`
+- Educational: `tutorial`, `course`, `how-to`, `explainer`, `lecture`, `demonstration`
+- Review: `review`, `unboxing`, `comparison`, `buying-guide`
+- Other: `podcast`, `interview`, `documentary`, `news`, `short-form`, `long-form`
+
+**Aim for 2-4 tags** from this section that describe the video's format and presentation style.
 
 **Guidelines:**
 - Use **lowercase, hyphenated** format (`machine-learning`, not `Machine Learning`)

@@ -57,7 +57,7 @@ class Settings:
 
         # OpenAI (LLM + embeddings)
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
-        self.openai_chat_model = os.getenv("OPENAI_CHAT_MODEL", "gpt-5")
+        self.openai_chat_model = os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1-2025-04-14")
         self.openai_embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
         # Neo4j (graph)
