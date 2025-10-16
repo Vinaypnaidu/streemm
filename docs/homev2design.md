@@ -16,8 +16,6 @@
 { "id": "uuid", "name": "string", "canonical_name": "string", "prominence": 0.0 }
 ```
 
-*Note:* `category` is **index-only** (LLM-generated) → embedding + OpenSearch only.
-
 **Tags —** searchable labels derived from topics, entities, and overall content nature; mix domain/field, format/style, and key attributes for discovery.
 
 ```json
@@ -105,7 +103,7 @@ Metadata: content_type={one of enum}, language={en}
     { "name": "string", "canonical_name": "string", "importance": 0.0, "type": "string" }
   ],
   "topics": [
-    { "name": "string", "canonical_name": "string", "prominence": 0.0, "category": "string" }
+    { "name": "string", "canonical_name": "string", "prominence": 0.0}
   ],
   "tags": [
     { "name": "string", "canonical_name": "string", "weight": 0.0 }
@@ -151,10 +149,10 @@ Metadata: content_type={one of enum}, language={en}
 
 ## 4) Extraction & Indexing Flow
 
-1. **Extract (LLM/agents):** entities (**plus index-only `type`**), topics (**plus index-only `category`**), **tags** (first-class), short_summary, metadata.
+1. **Extract (LLM/agents):** entities (**plus index-only `type`**), topics, **tags**, short_summary, metadata.
 2. **Persist to Postgres (upserts):**
    `video_summary.short_summary`;
-   `topics` + `video_topics(prominence)` *(no `category` in DB)*;
+   `topics` + `video_topics(prominence)` ;
    `entities` + `video_entities(importance)` *(no `type` in DB)*;
    `tags` + `video_tags(weight)`;
    update `videos(content_type|duration_s|language|description)` as needed.
@@ -162,7 +160,7 @@ Metadata: content_type={one of enum}, language={en}
 4. **Build embedding text** using the template (include **description + summary + tags/topics/entities**).
 5. **Embed** → single video-level vector.
 6. **Index in OpenSearch** (upsert per video): `id`, `title`, `description`, `content_type`, `duration_s`, `language`,
-   `entities[]` *(incl. type)*, `topics[]` *(incl. category)*, **`tags[]` (nested objects)**, `embedding`.
+   `entities[]` *(incl. type)*, `topics[]`, **`tags[]` (nested objects)**, `embedding`.
    *(Summary is **not** indexed in OS; embedding-only + UI.)*
 
 ---
