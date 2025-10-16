@@ -56,7 +56,7 @@ Description: {source description}
 
 Summary: {short_summary}
 
-Topics: {topic1} | {topic2} | {topic3}   
+Topics: {topic1} | {topic2} | {topic3}
 Entities: {name1 (person)} | {name2 (product)}   // include entity type inline
 Tags: {tag1} | {tag2} | {tag3}
 
@@ -105,10 +105,11 @@ Metadata: content_type={one of enum}, language={en}
     { "name": "string", "canonical_name": "string", "importance": 0.0, "type": "string" }
   ],
   "topics": [
-    { "name": "string", "canonical_name": "string", "prominence": 0.0 }
+    { "name": "string", "canonical_name": "string", "prominence": 0.0, "category": "string" }
   ],
-
-  "tags": ["string", "string"],
+  "tags": [
+    { "name": "string", "canonical_name": "string", "weight": 0.0 }
+  ],
 
   "embedding": [0.0]
 }
@@ -116,12 +117,12 @@ Metadata: content_type={one of enum}, language={en}
 
 *Mapping hints:*
 
-* `title`, `description`, `tags` as `text` **with** `.keyword` subfields (for exact filters/aggs).
-* `entities` and `topics` as **`nested`** objects.
+* `title`, `description` as `text` **with** `.keyword` subfields (for exact filters/aggs).
+* `entities`, `topics`, **and `tags`** as **`nested`** objects; within each, map `name` as `text` + `.keyword`, `canonical_name` as `keyword`, numeric weights as `float`.
 * `embedding` as **`knn_vector`** (HNSW).
 
 **BM25 fields (and boosts):**
-`title^3, description^2, tags^2, topics.name^1, entities.name^1`
+`title^3, description^2, tags.name^2, topics.name^1, entities.name^1`
 
 ### 3.3 Neo4j Graph Layer (bipartite, lean)
 
@@ -153,15 +154,15 @@ Metadata: content_type={one of enum}, language={en}
 1. **Extract (LLM/agents):** entities (**plus index-only `type`**), topics (**plus index-only `category`**), **tags** (first-class), short_summary, metadata.
 2. **Persist to Postgres (upserts):**
    `video_summary.short_summary`;
-   `topics` + `video_topics(prominence)` *(no `category`)*;
-   `entities` + `video_entities(importance)` *(no `type`)*;
+   `topics` + `video_topics(prominence)` *(no `category` in DB)*;
+   `entities` + `video_entities(importance)` *(no `type` in DB)*;
    `tags` + `video_tags(weight)`;
    update `videos(content_type|duration_s|language|description)` as needed.
 3. **Sync to Neo4j:** upsert `Video/Topic/Entity/Tag` nodes and `HAS_TOPIC/HAS_ENTITY/HAS_TAG` edges.
 4. **Build embedding text** using the template (include **description + summary + tags/topics/entities**).
 5. **Embed** → single video-level vector.
 6. **Index in OpenSearch** (upsert per video): `id`, `title`, `description`, `content_type`, `duration_s`, `language`,
-   `entities[]` *(incl. type)*, `topics[]` *(incl. category)*, `tags[]`, `embedding`.
+   `entities[]` *(incl. type)*, `topics[]` *(incl. category)*, **`tags[]` (nested objects)**, `embedding`.
    *(Summary is **not** indexed in OS; embedding-only + UI.)*
 
 ---
@@ -178,7 +179,7 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
 * **Lane quotas:** OS = **60**, Graph = **40** (redistribute if a lane under-fills)
 * **OS recall caps:** **kNN@300**, **BM25@300**
 * **Graph recall caps:** **1-hop@200**, **2-hop@200** (both mandatory)
-* **Within-lane MMR:** λ≈0.7 (diversify by `topics.category` / `entities.type` / `tags`)
+* **Within-lane MMR:** λ≈0.7 (diversify by topics/entities/tags)
 * **No uploader rules** (diversity via MMR only)
 
 ### 1) Build user signal
@@ -189,7 +190,7 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
 ### 2) OS lane (OpenSearch: similarity + keywords)
 
 1. **Recall (parallel):** kNN(300) on `embedding` with `u`, and BM25(300) using seed names over **BM25 fields**:
-   `title^3, description^2, tags^2, topics.name^1, entities.name^1` → **union & dedupe**.
+   `title^3, description^2, tags.name^2, topics.name^1, entities.name^1` → **union & dedupe**.
 2. **Normalize** to [0,1]: `cos_norm`, `bm25_norm`, `freshness = exp(-age_days/30)`.
 3. **Lane score:** `OS_score = 0.60·cos_norm + 0.30·bm25_norm + 0.10·freshness`.
 4. **Within-lane MMR** (λ≈0.7); keep shortlist ≈ **120**.
@@ -220,7 +221,7 @@ Take **60** from the OS shortlist and **40** from the Graph shortlist. If a lane
 
 ### 6) Global MMR (final ordering only)
 
-Run one global MMR across the **100** selected videos to interleave and diversify (use lane scores as relevance; similarity from embeddings + category/type/tags). **Preserve the 60/40 counts**—this step only reorders.
+Run one global MMR across the **100** selected videos to interleave and diversify (use lane scores as relevance; similarity from embeddings + topics/entities/tags). **Preserve the 60/40 counts**—this step only reorders.
 
 ### 7) Explanations
 
@@ -229,7 +230,7 @@ Run one global MMR across the **100** selected videos to interleave and diversif
 
 ### 8) Useful counters (to tune later)
 
-Lane CTRs, under-fill rates, cross-lane overlap removed, post-MMR diversity by category/type/tags.
+Lane CTRs, under-fill rates, cross-lane overlap removed, post-MMR diversity by topics/entities/tags.
 
 ---
 
