@@ -8,8 +8,6 @@
 { "id": "uuid", "name": "string", "canonical_name": "string", "importance": 0.0 }
 ```
 
-*Note:* `type` is **index-only** (LLM-generated) → used in embedding + OpenSearch, **not** in DB.
-
 **Topics —** concrete subjects/skills covered by the video (e.g., “pasta making”, “gradient descent”). `prominence` reflects share of focus/time.
 
 ```json
@@ -55,7 +53,7 @@ Description: {source description}
 Summary: {short_summary}
 
 Topics: {topic1} | {topic2} | {topic3}
-Entities: {name1 (person)} | {name2 (product)}   // include entity type inline
+Entities: {name1} | {name2} | {name3}
 Tags: {tag1} | {tag2} | {tag3}
 
 Metadata: content_type={one of enum}, language={en}
@@ -94,16 +92,16 @@ Metadata: content_type={one of enum}, language={en}
 {
   "id": "uuid",
   "title": "string",
-  "description": "string",              // from videos.description
+  "description": "string",
   "content_type": "string",
   "duration_s": 0,
   "language": "en",
 
   "entities": [
-    { "name": "string", "canonical_name": "string", "importance": 0.0, "type": "string" }
+    { "name": "string", "canonical_name": "string", "importance": 0.0 }
   ],
   "topics": [
-    { "name": "string", "canonical_name": "string", "prominence": 0.0}
+    { "name": "string", "canonical_name": "string", "prominence": 0.0 }
   ],
   "tags": [
     { "name": "string", "canonical_name": "string", "weight": 0.0 }
@@ -116,7 +114,7 @@ Metadata: content_type={one of enum}, language={en}
 *Mapping hints:*
 
 * `title`, `description` as `text` **with** `.keyword` subfields (for exact filters/aggs).
-* `entities`, `topics`, **and `tags`** as **`nested`** objects; within each, map `name` as `text` + `.keyword`, `canonical_name` as `keyword`, numeric weights as `float`.
+* `entities`, `topics`, and `tags` as **`nested`** objects; within each, map `name` as `text` + `.keyword`, `canonical_name` as `keyword`, numeric weights as `float`.
 * `embedding` as **`knn_vector`** (HNSW).
 
 **BM25 fields (and boosts):**
@@ -149,18 +147,18 @@ Metadata: content_type={one of enum}, language={en}
 
 ## 4) Extraction & Indexing Flow
 
-1. **Extract (LLM/agents):** entities (**plus index-only `type`**), topics, **tags**, short_summary, metadata.
+1. **Extract (LLM/agents):** entities, topics, **tags**, short_summary, metadata.
 2. **Persist to Postgres (upserts):**
    `video_summary.short_summary`;
-   `topics` + `video_topics(prominence)` ;
-   `entities` + `video_entities(importance)` *(no `type` in DB)*;
+   `topics` + `video_topics(prominence)`;
+   `entities` + `video_entities(importance)`;
    `tags` + `video_tags(weight)`;
    update `videos(content_type|duration_s|language|description)` as needed.
 3. **Sync to Neo4j:** upsert `Video/Topic/Entity/Tag` nodes and `HAS_TOPIC/HAS_ENTITY/HAS_TAG` edges.
 4. **Build embedding text** using the template (include **description + summary + tags/topics/entities**).
 5. **Embed** → single video-level vector.
 6. **Index in OpenSearch** (upsert per video): `id`, `title`, `description`, `content_type`, `duration_s`, `language`,
-   `entities[]` *(incl. type)*, `topics[]`, **`tags[]` (nested objects)**, `embedding`.
+   `entities[]`, `topics[]`, `tags[]`, `embedding`.
    *(Summary is **not** indexed in OS; embedding-only + UI.)*
 
 ---

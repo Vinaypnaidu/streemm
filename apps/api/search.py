@@ -10,8 +10,13 @@ from opensearchpy import OpenSearch
 from opensearchpy.exceptions import NotFoundError
 from opensearchpy.helpers import bulk
 
+from sqlalchemy.orm import Session
+
 from config import settings
 from storage import build_public_url, build_thumbnail_key
+from embedding_utils import build_video_embedding_text, generate_embedding
+from indexing_bundle import load_video_index_bundle
+from indexing_payload import build_video_search_document
 
 log = logging.getLogger("search")
 if not log.handlers:
@@ -101,6 +106,9 @@ def _ensure_videos_index(client: OpenSearch) -> None:
             "number_of_shards": 1,
             "number_of_replicas": 0,
             "refresh_interval": "1s",
+            "index": {
+                "knn": True,
+            },
         },
         "mappings": {
             "properties": {
@@ -108,12 +116,62 @@ def _ensure_videos_index(client: OpenSearch) -> None:
                     "type": "text",
                     "fields": {"raw": {"type": "keyword", "ignore_above": 256}},
                 },
-                "description": {"type": "text"},
-                "user_id": {"type": "keyword"},
-                "created_at": {"type": "date"},
+                "description": {
+                    "type": "text",
+                    "fields": {"raw": {"type": "keyword", "ignore_above": 512}},
+                },
+                "content_type": {"type": "keyword"},
+                "language": {"type": "keyword"},
                 "duration_seconds": {"type": "float"},
-                "thumbnail_url": {"type": "keyword", "ignore_above": 512},
+                "created_at": {"type": "date"},
+                "updated_at": {"type": "date"},
+                "user_id": {"type": "keyword"},
                 "status": {"type": "keyword"},
+                "embedding": {
+                    "type": "knn_vector",
+                    "dimension": 1536,
+                    "method": {
+                        "name": "hnsw",
+                        "engine": "nmslib",
+                        "space_type": "cosinesimil",
+                    },
+                },
+                "topics": {
+                    "type": "nested",
+                    "properties": {
+                        "id": {"type": "keyword"},
+                        "name": {
+                            "type": "text",
+                            "fields": {"keyword": {"type": "keyword", "ignore_above": 256}},
+                        },
+                        "canonical_name": {"type": "keyword"},
+                        "prominence": {"type": "float"},
+                    },
+                },
+                "entities": {
+                    "type": "nested",
+                    "properties": {
+                        "id": {"type": "keyword"},
+                        "name": {
+                            "type": "text",
+                            "fields": {"keyword": {"type": "keyword", "ignore_above": 256}},
+                        },
+                        "canonical_name": {"type": "keyword"},
+                        "importance": {"type": "float"},
+                    },
+                },
+                "tags": {
+                    "type": "nested",
+                    "properties": {
+                        "id": {"type": "keyword"},
+                        "name": {
+                            "type": "text",
+                            "fields": {"keyword": {"type": "keyword", "ignore_above": 256}},
+                        },
+                        "canonical_name": {"type": "keyword"},
+                        "weight": {"type": "float"},
+                    },
+                },
             }
         },
     }
@@ -182,10 +240,65 @@ def index_video_metadata(video) -> None:
     }
 
     try:
-        client.index(index=VIDEOS_INDEX, id=video_id, body=doc, refresh="wait_for")
-        log.info("Indexed video metadata for %s", video_id)
+        doc_clean = {k: v for k, v in doc.items() if v is not None}
+        client.update(
+            index=VIDEOS_INDEX,
+            id=video_id,
+            body={"doc": doc_clean, "doc_as_upsert": True},
+            refresh="wait_for",
+        )
+        log.info("Upserted video metadata for %s", video_id)
     except Exception as exc:
         log.error("Failed to index video metadata for %s: %s", video_id, exc)
+
+
+def index_video_content(db: Session, video_id: str) -> None:
+    client = get_client()
+    if not client:
+        log.debug("OpenSearch not available, skipping video content indexing")
+        return
+
+    _ensure_indexes_once(client)
+
+    bundle = load_video_index_bundle(db, video_id)
+    if not bundle:
+        log.warning("index_video_content_missing_bundle video_id=%s", video_id)
+        return
+
+    embed_topics = [
+        t for t in bundle.topics if t.prominence >= settings.opensearch_topic_prominence_th
+    ]
+    embed_entities = [
+        e for e in bundle.entities if e.importance >= settings.opensearch_entity_importance_th
+    ]
+    embed_tags = [
+        g for g in bundle.tags if g.weight >= settings.opensearch_tag_weight_th
+    ]
+
+    embed_text = build_video_embedding_text(
+        title=bundle.title,
+        description=bundle.description,
+        summary=bundle.summary,
+        topics=embed_topics,
+        entities=embed_entities,
+        tags=embed_tags,
+        content_type=bundle.content_type,
+        language=bundle.language,
+    )
+
+    embedding = generate_embedding(embed_text)
+    if embedding is None:
+        log.info("index_video_content_no_embedding video_id=%s", video_id)
+
+    thumb_url = build_public_url(build_thumbnail_key(bundle.video_id))
+
+    doc = build_video_search_document(bundle, embedding=embedding, thumbnail_url=thumb_url)
+
+    try:
+        client.index(index=VIDEOS_INDEX, id=bundle.video_id, body=doc, refresh="wait_for")
+        log.info("Indexed video content for %s", video_id)
+    except Exception as exc:
+        log.error("Failed to index video content for %s: %s", video_id, exc)
 
 
 def index_transcript_chunks(video_id: str, chunks: Iterable[Dict[str, Any]]) -> None:

@@ -29,9 +29,7 @@ class Settings:
         self.s3_use_ssl = os.getenv("S3_USE_SSL", "false").lower() == "true"
 
         self.presign_expires_seconds = int(os.getenv("PRESIGN_EXPIRES_SECONDS", "900"))
-        self.upload_max_bytes = int(
-            os.getenv("UPLOAD_MAX_BYTES", str(1 * 1024 * 1024 * 1024))
-        )  # 1GB
+        self.upload_max_bytes = int(os.getenv("UPLOAD_MAX_BYTES", str(1 * 1024 * 1024 * 1024)))  # 1GB
         self.upload_allowed_mime = os.getenv("UPLOAD_ALLOWED_MIME", "video/mp4")
 
         # Worker / FFmpeg settings
@@ -39,23 +37,13 @@ class Settings:
         self.ffprobe_bin = os.getenv("FFPROBE_BIN", "ffprobe")
 
         self.ffprobe_timeout_seconds = int(os.getenv("FFPROBE_TIMEOUT_SECONDS", "30"))
-        self.ffmpeg_timeout_720p_seconds = int(
-            os.getenv("FFMPEG_TIMEOUT_720P_SECONDS", "1200")
-        )
-        self.ffmpeg_timeout_480p_seconds = int(
-            os.getenv("FFMPEG_TIMEOUT_480P_SECONDS", "900")
-        )
-        self.thumbnail_timeout_seconds = int(
-            os.getenv("THUMBNAIL_TIMEOUT_SECONDS", "30")
-        )
+        self.ffmpeg_timeout_720p_seconds = int(os.getenv("FFMPEG_TIMEOUT_720P_SECONDS", "1200"))
+        self.ffmpeg_timeout_480p_seconds = int(os.getenv("FFMPEG_TIMEOUT_480P_SECONDS", "900"))
+        self.thumbnail_timeout_seconds = int(os.getenv("THUMBNAIL_TIMEOUT_SECONDS", "30"))
 
-        self.worker_lock_ttl_ms = int(
-            os.getenv("WORKER_LOCK_TTL_MS", str(15 * 60 * 1000))
-        )
+        self.worker_lock_ttl_ms = int(os.getenv("WORKER_LOCK_TTL_MS", str(15 * 60 * 1000)))
         backoff_csv = os.getenv("WORKER_BACKOFF_SECONDS", "30,120,300")
-        self.worker_backoff_seconds = [
-            int(x.strip()) for x in backoff_csv.split(",") if x.strip()
-        ]
+        self.worker_backoff_seconds = [int(x.strip()) for x in backoff_csv.split(",") if x.strip()]
 
         # OpenSearch
         self.opensearch_url = os.getenv("OPENSEARCH_URL", "http://localhost:9200")
@@ -70,9 +58,7 @@ class Settings:
         # OpenAI (LLM + embeddings)
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
         self.openai_chat_model = os.getenv("OPENAI_CHAT_MODEL", "gpt-5")
-        self.openai_embedding_model = os.getenv(
-            "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
-        )
+        self.openai_embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
         # Neo4j (graph)
         self.neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -82,6 +68,11 @@ class Settings:
         self.neo4j_prominence_insert_th = float(os.getenv("NEO4J_PROMINENCE_INSERT_TH", "0.50"))
         self.neo4j_importance_insert_th = float(os.getenv("NEO4J_IMPORTANCE_INSERT_TH", "0.50"))
         self.neo4j_tag_weight_insert_th = float(os.getenv("NEO4J_TAG_WEIGHT_INSERT_TH", "0.50"))
+
+        # OpenSearch (index thresholds)
+        self.opensearch_topic_prominence_th = float(os.getenv("OPENSEARCH_TOPIC_PROMINENCE_TH", "0.50"))
+        self.opensearch_entity_importance_th = float(os.getenv("OPENSEARCH_ENTITY_IMPORTANCE_TH", "0.50"))
+        self.opensearch_tag_weight_th = float(os.getenv("OPENSEARCH_TAG_WEIGHT_TH", "0.50"))
 
         # Email / SMTP
         self.email_enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
@@ -94,9 +85,7 @@ class Settings:
         self.smtp_ssl = os.getenv("SMTP_SSL", "false").lower() == "true"
 
         # Public base URL (for links in emails)
-        self.public_web_base_url = os.getenv(
-            "PUBLIC_WEB_BASE_URL", "http://localhost:3000"
-        )
+        self.public_web_base_url = os.getenv("PUBLIC_WEB_BASE_URL", "http://localhost:3000")
 
 
 settings = Settings()

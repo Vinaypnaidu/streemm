@@ -23,7 +23,7 @@ from storage import (
     upload_dir,
     build_caption_key,
 )
-from search import index_video_metadata
+from search import index_video_metadata, index_video_content
 from extract import extract_from_transcript, persist_result
 from graph import sync_video
 
@@ -713,6 +713,11 @@ def process_video(video_id: str, reason: str) -> None:
                         try:
                             persist_result(db, video_id, res)
                             log.info(json.dumps({"video_id": video_id, "step": "extract", "status": "persisted"}))
+                            try:
+                                index_video_content(db, video_id)
+                                log.info(json.dumps({"video_id": video_id, "step": "index", "status": "ok"}))
+                            except Exception:
+                                log.exception("index_video_content_failed")
                         except Exception:
                             log.exception("extract_persist_failed")
         except Exception:

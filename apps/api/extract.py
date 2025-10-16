@@ -36,7 +36,6 @@ class EntityItem(BaseModel):
     name: str
     canonical_name: str
     importance: float = Field(ge=0.0, le=1.0)
-    entity_type: Optional[str] = None  # index-only; not persisted to Postgres
 
     @validator("canonical_name", pre=True)
     def _canon(cls, v: str) -> str:

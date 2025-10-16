@@ -124,13 +124,13 @@ Entities are **specific instances central to the video** - such as particular pe
 
 **Format:**
 ```json
-{{"name": "Gordon Ramsay", "canonical_name": "gordon ramsay", "importance": 0.9, "entity_type": "person"}}
-{{"name": "iPhone 15", "canonical_name": "iphone 15", "importance": 0.7, "entity_type": "product"}}
-{{"name": "Paris", "canonical_name": "paris", "importance": 0.5, "entity_type": "place"}}
-{{"name": "OpenAI", "canonical_name": "openai", "importance": 0.8, "entity_type": "organization"}}
-{{"name": "Python", "canonical_name": "python", "importance": 0.85, "entity_type": "programming language"}}
-{{"name": "The Office", "canonical_name": "the office", "importance": 0.9, "entity_type": "tv show"}}
-{{"name": "World War II", "canonical_name": "world war ii", "importance": 0.8, "entity_type": "event"}}
+{{"name": "Gordon Ramsay", "canonical_name": "gordon ramsay", "importance": 0.9}}
+{{"name": "iPhone 15", "canonical_name": "iphone 15", "importance": 0.7}}
+{{"name": "Paris", "canonical_name": "paris", "importance": 0.5}}
+{{"name": "OpenAI", "canonical_name": "openai", "importance": 0.8}}
+{{"name": "Python", "canonical_name": "python", "importance": 0.85}}
+{{"name": "The Office", "canonical_name": "the office", "importance": 0.9}}
+{{"name": "World War II", "canonical_name": "world war ii", "importance": 0.8}}
 ```
 
 ---
@@ -202,7 +202,7 @@ Return **valid JSON only** (no markdown, no explanation).
     {{"name": "Display Name", "canonical_name": "lowercase normalized", "prominence": 0.0}}
   ],
   "entities": [
-    {{"name": "Display Name", "canonical_name": "lowercase normalized", "importance": 0.0, "entity_type": "string"}}
+    {{"name": "Display Name", "canonical_name": "lowercase normalized", "importance": 0.0}}
   ],
   "tags": [
     {{"tag": "lowercase-hyphenated", "weight": 0.0}}
@@ -228,9 +228,9 @@ Return **valid JSON only** (no markdown, no explanation).
     {{"name": "Bread Shaping", "canonical_name": "bread shaping", "prominence": 0.6}}
   ],
   "entities": [
-    {{"name": "Sarah Johnson", "canonical_name": "sarah johnson", "importance": 0.8, "entity_type": "person"}},
-    {{"name": "Sourdough Starter", "canonical_name": "sourdough starter", "importance": 0.5, "entity_type": "ingredient"}},
-    {{"name": "Dough", "canonical_name": "dough", "importance": 0.65, "entity_type": "ingredient"}}
+    {{"name": "Sarah Johnson", "canonical_name": "sarah johnson", "importance": 0.8}},
+    {{"name": "Sourdough Starter", "canonical_name": "sourdough starter", "importance": 0.5}},
+    {{"name": "Dough", "canonical_name": "dough", "importance": 0.65}}
   ],
   "tags": [
     {{"tag": "baking", "weight": 0.95}},
@@ -239,6 +239,7 @@ Return **valid JSON only** (no markdown, no explanation).
     {{"tag": "fermentation", "weight": 0.7}},
     {{"tag": "cooking", "weight": 0.75}},
     {{"tag": "culinary-skills", "weight": 0.75}},
+    {{"tag": "tutorial", "weight": 0.6}}
   ]
 }}
 ```
