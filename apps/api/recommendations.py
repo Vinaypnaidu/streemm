@@ -24,22 +24,19 @@ from models import (
 )
 
 HISTORY_DEPTH = 25
-RECENCY_HALF_LIFE_DAYS = 14.0
+RECENCY_HALF_LIFE_DAYS = 21
 
-MAX_TAG_SEEDS = 15
-MAX_ENTITY_SEEDS = 13
-MAX_TOPIC_SEEDS = 7
+MAX_TAG_SEEDS = 20
+MAX_ENTITY_SEEDS = 15
+MAX_TOPIC_SEEDS = 5
 
 TARGET_TOTAL_RECOMMENDATIONS = 100
 OS_LANE_QUOTA = 60
 GRAPH_LANE_QUOTA = 40
-OS_KNN_RECALL_K = 300
-OS_BM25_RECALL_K = 300
+OS_BM25_RECALL_K = 1000
 GRAPH_ONE_HOP_RECALL_K = 200
 GRAPH_TWO_HOP_RECALL_K = 200
 MMR_LAMBDA = 0.7
-OS_WITHIN_LANE_SHORTLIST = 120
-OS_MMR_POOL_MULTIPLIER = 2
 OS_COSINE_WEIGHT = 0.5
 OS_BM25_WEIGHT = 0.5
 
@@ -61,22 +58,7 @@ OS_SOURCE_FIELDS = [
     "updated_at",
     "thumbnail_url",
     "status",
-]
-
-# Lean source for recall; embeddings will be hydrated only for the MMR pool
-OS_SOURCE_FIELDS_LEAN = [
-    "title",
-    "description",
-    "content_type",
-    "language",
-    "topics",
-    "entities",
-    "tags",
-    "duration_seconds",
-    "created_at",
-    "updated_at",
-    "thumbnail_url",
-    "status",
+    "embedding",
 ]
 
 
@@ -461,55 +443,6 @@ def _build_bm25_terms(seed_bundle: SeedBundle) -> List[str]:
     return terms
 
 
-def _execute_knn_search(
-    client: OpenSearch,
-    query_vector: Sequence[float],
-    exclude_video_ids: Optional[Sequence[str]] = None,
-) -> List[Dict[str, Any]]:
-    if not query_vector:
-        return []
-
-    vector = [float(x) for x in query_vector]
-    excludes = [str(x) for x in (exclude_video_ids or [])]
-    
-    must_not_clauses = []
-    if excludes:
-        must_not_clauses.append({"ids": {"values": excludes}})
-    
-    body = {
-        "size": OS_KNN_RECALL_K,
-        "track_total_hits": False,
-        "_source": OS_SOURCE_FIELDS_LEAN,
-        "query": {
-            "bool": {
-                "must": [
-                    {
-                        "knn": {
-                            "embedding": {
-                                "vector": vector,
-                                "k": OS_KNN_RECALL_K,
-                            }
-                        }
-                    }
-                ],
-                "filter": [
-                    {"term": {"status": "ready"}}
-                ],
-                "must_not": must_not_clauses
-            }
-        }
-    }
-
-    try:
-        response = client.search(index=VIDEOS_INDEX, body=body, request_timeout=2.0)
-    except Exception as exc:
-        log.warning("recommendations_knn_search_failed", exc_info=exc)
-        return []
-
-    hits = response.get("hits", {}).get("hits", []) if isinstance(response, dict) else []
-    return hits
-
-
 def _execute_bm25_search(
     client: OpenSearch,
     terms: Sequence[str],
@@ -526,7 +459,7 @@ def _execute_bm25_search(
     body = {
         "size": OS_BM25_RECALL_K,
         "track_total_hits": False,
-        "_source": OS_SOURCE_FIELDS_LEAN,
+        "_source": OS_SOURCE_FIELDS,
         "query": {
             "bool": {
                 "must_not": ([{"ids": {"values": excludes}}] if excludes else []),
@@ -606,58 +539,30 @@ def _execute_bm25_search(
     return hits
 
 
-def _merge_os_hits(
-    knn_hits: Sequence[Dict[str, Any]],
-    bm25_hits: Sequence[Dict[str, Any]],
-) -> List[OSCandidate]:
-    candidates: Dict[str, OSCandidate] = {}
-
-    def upsert(hit: Dict[str, Any], source_label: str) -> OSCandidate:
+def _build_candidates_from_bm25(bm25_hits: Sequence[Dict[str, Any]]) -> List[OSCandidate]:
+    candidates: List[OSCandidate] = []
+    seen: Set[str] = set()
+    for hit in bm25_hits:
         raw_id = hit.get("_id")
         if not raw_id:
-            raise KeyError
+            continue
         video_id = str(raw_id)
-        candidate = candidates.get(video_id)
-        if not candidate:
-            source_doc = hit.get("_source") or {}
-            candidate = OSCandidate(
-                video_id=video_id,
-                document=source_doc,
-                embedding=None,
-                sources=[source_label],
-            )
-            candidates[video_id] = candidate
-        else:
-            if source_label not in candidate.sources:
-                candidate.sources.append(source_label)
-            source_doc = hit.get("_source") or {}
-            if source_doc:
-                missing_keys = {k: v for k, v in source_doc.items() if k not in candidate.document}
-                if missing_keys:
-                    candidate.document.update(missing_keys)
-        return candidate
-
-    for hit in knn_hits:
-        try:
-            candidate = upsert(hit, "knn")
-        except KeyError:
+        if video_id in seen:
             continue
+        seen.add(video_id)
+        source_doc = hit.get("_source") or {}
+        cand = OSCandidate(
+            video_id=video_id,
+            document=source_doc,
+            embedding=_safe_get_embedding(source_doc),
+            sources=["bm25"],
+        )
         try:
-            candidate.cosine_score = float(hit.get("_score") or 0.0)
+            cand.bm25_score = float(hit.get("_score") or 0.0)
         except Exception:
-            candidate.cosine_score = 0.0
-
-    for hit in bm25_hits:
-        try:
-            candidate = upsert(hit, "bm25")
-        except KeyError:
-            continue
-        try:
-            candidate.bm25_score = float(hit.get("_score") or 0.0)
-        except Exception:
-            candidate.bm25_score = 0.0
-
-    return list(candidates.values())
+            cand.bm25_score = 0.0
+        candidates.append(cand)
+    return candidates
 
 
 def _score_os_candidates(candidates: Sequence[OSCandidate]) -> None:
@@ -673,53 +578,46 @@ def _score_os_candidates(candidates: Sequence[OSCandidate]) -> None:
         )
 
 
-def _hydrate_embeddings_for_pool(client: OpenSearch, pool: List[OSCandidate]) -> None:
-    pending: Dict[str, OSCandidate] = {c.video_id: c for c in pool if c.embedding is None}
-    if not pending:
-        return
-    try:
-        response = client.mget(
-            index=VIDEOS_INDEX,
-            body={"ids": list(pending.keys())},
-            _source=["embedding"],
-            request_timeout=2.0,
-        )
-    except Exception as exc:
-        log.warning("recommendations_pool_mget_failed", exc_info=exc)
-        return
-
-    docs = response.get("docs", []) if isinstance(response, dict) else []
-    hydrated = 0
-
-    for doc in docs:
-        if not doc or not doc.get("found"):
-            continue
-        vid = str(doc.get("_id"))
-        cand = pending.get(vid)
-        if not cand or cand.embedding is not None:
-            continue
-
-        vec = _safe_get_embedding(doc.get("_source") or {})
-        if vec is None or any(not math.isfinite(x) for x in vec):
-            continue
-
-        cand.embedding = vec
-        hydrated += 1
-
-    if hydrated and hydrated < len(pending):
-        log.debug(
-            "recommendations_pool_mget_partial",
-            extra={"requested": len(pending), "hydrated": hydrated},
-        )
-
-
 def _candidate_similarity(a: OSCandidate, b: OSCandidate) -> float:
-    if a.embedding and b.embedding:
-        similarity = cosine_similarity(a.embedding, b.embedding)
-        if similarity < 0:
-            return 0.0
-        return min(similarity, 1.0)
-    return 0.0
+    """
+    Jaccard similarity based on entities and tags.
+    Faster than embedding-based similarity.
+    """
+    def to_tokens(doc: Dict[str, Any]) -> Set[str]:
+        tokens: Set[str] = set()
+        # Entities can be list[dict] or list[str]
+        for e in doc.get("entities", []) or []:
+            if isinstance(e, dict):
+                val = (e.get("canonical_name") or e.get("name") or "").strip()
+                if val:
+                    tokens.add(val.lower())
+            elif isinstance(e, str):
+                s = e.strip().lower()
+                if s:
+                    tokens.add(s)
+        # Tags can be list[str] or list[dict]
+        for t in doc.get("tags", []) or []:
+            if isinstance(t, dict):
+                val = (t.get("canonical_name") or t.get("name") or "").strip()
+                if val:
+                    tokens.add(val.lower())
+            elif isinstance(t, str):
+                s = t.strip().lower()
+                if s:
+                    tokens.add(s)
+        return tokens
+
+    a_tokens = to_tokens(a.document)
+    b_tokens = to_tokens(b.document)
+
+    if not a_tokens or not b_tokens:
+        return 0.0
+
+    inter = len(a_tokens & b_tokens)
+    union = len(a_tokens | b_tokens)
+    if union <= 0:
+        return 0.0
+    return inter / union
 
 
 def run_opensearch_lane(seed_bundle: SeedBundle) -> OSLaneResult:
@@ -733,36 +631,45 @@ def run_opensearch_lane(seed_bundle: SeedBundle) -> OSLaneResult:
     bm25_terms = _build_bm25_terms(seed_bundle)
     exclude_ids = [str(h.video_id) for h in seed_bundle.history]
 
-    knn_hits: List[Dict[str, Any]] = []
-    if seed_bundle.user_embedding:
-        knn_hits = _execute_knn_search(client, seed_bundle.user_embedding, exclude_ids)
-
     bm25_hits: List[Dict[str, Any]] = []
     bm25_hits = _execute_bm25_search(client, bm25_terms, exclude_ids)
 
-    if not knn_hits and not bm25_hits:
+    # BM25-first recall: if nothing is recalled, return early
+    if not bm25_hits:
         log.info("recommendations_os_lane_empty_results")
         return OSLaneResult(shortlist=[], candidates=[], bm25_terms=bm25_terms)
 
-    candidates = _merge_os_hits(knn_hits, bm25_hits)
+    # Build candidate set from BM25 recall only
+    candidates = _build_candidates_from_bm25(bm25_hits)
     if not candidates:
         return OSLaneResult(shortlist=[], candidates=[], bm25_terms=bm25_terms)
+
+    # Compute cosine similarity against the user profile embedding when available
+    # TODO: Consider vectorizing this step with numpy
+    if seed_bundle.user_embedding:
+        user_vec = [float(x) for x in seed_bundle.user_embedding]
+        for cand in candidates:
+            if cand.embedding:
+                cand.cosine_score = cosine_similarity(user_vec, cand.embedding)
+            else:
+                cand.cosine_score = 0.0
+    else:
+        # No user embedding -> cosine contributes 0
+        for cand in candidates:
+            cand.cosine_score = 0.0
 
     _score_os_candidates(candidates)
 
     candidates_sorted = sorted(candidates, key=lambda item: item.lane_score, reverse=True)
 
-    shortlist_limit = min(OS_WITHIN_LANE_SHORTLIST, len(candidates_sorted))
-    if shortlist_limit == 0:
-        return OSLaneResult(shortlist=[], candidates=candidates_sorted, bm25_terms=bm25_terms)
-
-    pool_size = min(
-        len(candidates_sorted),
-        max(shortlist_limit, OS_MMR_POOL_MULTIPLIER * shortlist_limit),
-    )
+    # Feed MMR with up to 4x lane quota candidates 
+    pool_size = min(4 * OS_LANE_QUOTA, len(candidates_sorted))
     pool = candidates_sorted[:pool_size]
 
-    _hydrate_embeddings_for_pool(client, pool)
+    # Select up to 2x lane quota via MMR 
+    shortlist_limit = min(2 * OS_LANE_QUOTA, len(candidates_sorted))
+    if shortlist_limit == 0:
+        return OSLaneResult(shortlist=[], candidates=candidates_sorted, bm25_terms=bm25_terms)
 
     shortlist = max_marginal_relevance(
         pool,

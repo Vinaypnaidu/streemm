@@ -173,9 +173,9 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
 * **Target N:** 100
 * **History depth:** last **25** watched videos
 * **Lane quotas:** OS = **60**, Graph = **40** (redistribute if a lane under-fills)
-* **OS recall caps:** **kNN@300**, **BM25@300**
+* **OS recall caps:** **BM25@1000**
 * **Graph recall caps:** **1-hop@200**, **2-hop@200** (both mandatory)
-* **Within-lane MMR:** λ≈0.7 (diversify by topics/entities/tags)
+* **Within-lane MMR:** λ≈0.7 (diversify by topics/entities/tags via Jaccard similarity)
 * **No uploader rules** (diversity via MMR only)
 
 ### 1) Build user signal
@@ -183,13 +183,13 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
 * **User vector `u`:** recency-weighted mean of the last **25** `video_vector`s (normalize).
 * **User seeds:** top **topics, entities, tags** from those videos with weights (`prominence` / `importance` / `weight`), e.g., ≤10 each.
 
-### 2) OS lane (OpenSearch: similarity + keywords)
+### 2) OS lane (OpenSearch: BM25 recall + semantic rerank)
 
-1. **Recall (parallel):** kNN(300) on `embedding` with `u`, and BM25(300) using seed names over **BM25 fields**:
-   `title^3, description^2, tags.name^2, topics.name^1, entities.name^1` → **union & dedupe**.
-2. **Normalize** to [0,1]: `cos_norm`, `bm25_norm`.
-3. **Lane score:** `OS_score = 0.50·cos_norm + 0.50·bm25_norm`.
-4. **Within-lane MMR** (λ≈0.7); keep shortlist ≈ **120**.
+1. **Recall (BM25-first):** BM25(1000) using seed names over **BM25 fields**:
+  `title^3, description^2, tags.name^2, topics.name^1, entities.name^1`.
+2. **Semantic reranking:** For the recalled set only, compute cosine similarity between the **user vector `u`** and each candidate's embedding; normalize cosine and BM25 to [0,1] → `cos_norm`, `bm25_norm`.
+3. **Lane score:** `OS_score = 0.50·cos_norm + 0.50·bm25_norm`; sort by this score.
+4. **Within-lane MMR** (λ≈0.7), similarity = **Jaccard over entities + tags**; keep shortlist ≈ **2× OS lane quota** (default 120).
 
 ### 3) Graph lane (Neo4j: adjacency/serendipity; **1-hop & 2-hop mandatory**)
 
