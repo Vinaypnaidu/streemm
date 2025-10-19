@@ -1,8 +1,6 @@
 # apps/api/routes_homefeed.py
 import logging
-import re
-from collections import Counter
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -12,72 +10,14 @@ from db import get_db
 from session import get_current_user
 from models import User, Video, WatchHistory
 from schemas import HomeFeedItem, HomeFeedResponse
-from search import get_client, ensure_indexes, VIDEOS_INDEX
+from recommendations import build_seed_bundle, run_opensearch_lane
+from search import ensure_indexes
 from storage import build_thumbnail_key, build_public_url
 
 router = APIRouter(prefix="/homefeed", tags=["homefeed"])
 
 log = logging.getLogger("routes_homefeed")
 
-_WORD_RE = re.compile(r"[a-z0-9]+")
-STOPWORDS: Set[str] = {
-    "a",
-    "an",
-    "the",
-    "to",
-    "is",
-    "in",
-    "on",
-    "of",
-    "for",
-    "and",
-    "or",
-    "as",
-    "at",
-    "be",
-    "by",
-    "with",
-    "from",
-    "this",
-    "that",
-    "it",
-    "you",
-    "your",
-    "are",
-    "was",
-    "were",
-    "will",
-    "can",
-    "not",
-    "we",
-    "our",
-    "they",
-    "them",
-    "their",
-    "i",
-    "me",
-    "my",
-    "mine",
-    "video",
-    "videos",
-    "watch",
-    "watched",
-}
-
-
-def _tokens_from_text(text: str) -> List[str]:
-    low = (text or "").lower()
-    toks = _WORD_RE.findall(low)
-    out: List[str] = []
-    for t in toks:
-        if not t or t in STOPWORDS:
-            continue
-        if t.isdigit():
-            continue
-        if len(t) < 2:
-            continue
-        out.append(t)
-    return out
 
 
 def _compute_progress_map(
@@ -131,16 +71,8 @@ def _make_items_from_videos(
     return HomeFeedResponse(items=items, source=source)
 
 
-def _fallback_random(db: Session, user: User) -> HomeFeedResponse:
-    vids = (
-        db.query(Video)
-        .filter(Video.status == "ready")
-        .order_by(func.random())
-        .limit(25)
-        .all()
-    )
-    progress = _compute_progress_map(db, user, [str(v.id) for v in vids])
-    return _make_items_from_videos(vids, progress, "random")
+def _empty_response() -> HomeFeedResponse:
+    return HomeFeedResponse(items=[], source="empty")
 
 
 @router.get("", response_model=HomeFeedResponse)
@@ -150,68 +82,18 @@ def homefeed(
 ):
     ensure_indexes()
 
-    rows = (
-        db.query(WatchHistory, Video)
-        .join(Video, WatchHistory.video_id == Video.id)
-        .filter(WatchHistory.user_id == user.id)
-        .order_by(WatchHistory.last_watched_at.desc())
-        .limit(15)
-        .all()
-    )
+    seeds = build_seed_bundle(db, user.id)
+    lane = run_opensearch_lane(seeds)
 
-    blob_parts: List[str] = []
-    for _wh, v in rows:
-        blob_parts.append((v.title or "").strip())
-        blob_parts.append((v.description or "").strip())
-    blob = " ".join([p for p in blob_parts if p])
-
-    tokens = _tokens_from_text(blob)
-    if tokens:
-        freq = Counter(tokens)
-        top_words = [w for w, _ in freq.most_common(50)]
-    else:
-        top_words = []
-
-    client = get_client()
-    if not client or not top_words:
-        return _fallback_random(db, user)
-
-    query = " ".join(top_words)
-    body = {
-        "size": 25,
-        "query": {
-            "bool": {
-                "must": [
-                    {
-                        "multi_match": {
-                            "query": query,
-                            "fields": ["title", "description"],
-                            "type": "best_fields",
-                        }
-                    }
-                ],
-                "filter": [{"term": {"status": "ready"}}],
-            }
-        },
-    }
-
-    try:
-        res = client.search(index=VIDEOS_INDEX, body=body)
-        hits = res.get("hits", {}).get("hits", [])
-    except Exception as exc:
-        log.warning("homefeed_opensearch_failed", exc_info=exc)
-        return _fallback_random(db, user)
-
-    ids = [h.get("_id") for h in hits if h.get("_id")]
+    ids = [c.video_id for c in lane.shortlist]
     if not ids:
-        return _fallback_random(db, user)
+        return _empty_response()
 
-    db_vids = db.query(Video).filter(Video.id.in_(ids), Video.status == "ready").all()
-    by_id = {str(v.id): v for v in db_vids}
-    ordered_vids: List[Video] = [by_id[i] for i in ids if i in by_id]
+    vids = db.query(Video).filter(Video.id.in_(ids), Video.status == "ready").all()
+    by_id = {str(v.id): v for v in vids}
+    ordered: List[Video] = [by_id[i] for i in ids if i in by_id]
+    if not ordered:
+        return _empty_response()
 
-    if not ordered_vids:
-        return _fallback_random(db, user)
-
-    progress = _compute_progress_map(db, user, [str(v.id) for v in ordered_vids])
-    return _make_items_from_videos(ordered_vids, progress, "keywords")
+    progress = _compute_progress_map(db, user, [str(v.id) for v in ordered])
+    return _make_items_from_videos(ordered, progress, "os_lane")

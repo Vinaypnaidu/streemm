@@ -1,6 +1,7 @@
+# apps/api/indexing_payload.py
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from indexing_bundle import VideoIndexBundle
 

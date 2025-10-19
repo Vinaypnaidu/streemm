@@ -187,8 +187,8 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
 
 1. **Recall (parallel):** kNN(300) on `embedding` with `u`, and BM25(300) using seed names over **BM25 fields**:
    `title^3, description^2, tags.name^2, topics.name^1, entities.name^1` → **union & dedupe**.
-2. **Normalize** to [0,1]: `cos_norm`, `bm25_norm`, `freshness = exp(-age_days/30)`.
-3. **Lane score:** `OS_score = 0.60·cos_norm + 0.30·bm25_norm + 0.10·freshness`.
+2. **Normalize** to [0,1]: `cos_norm`, `bm25_norm`.
+3. **Lane score:** `OS_score = 0.50·cos_norm + 0.50·bm25_norm`.
 4. **Within-lane MMR** (λ≈0.7); keep shortlist ≈ **120**.
 
 ### 3) Graph lane (Neo4j: adjacency/serendipity; **1-hop & 2-hop mandatory**)
@@ -202,8 +202,7 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
 
    * **NeighborNovelty** *(see below)* — how much the candidate contains **neighbors of the seeds** (not the seeds).
    * **MultiSeedSupport** *(see below)* — fraction of distinct seeds with **≥1 neighbor** present in the candidate.
-   * **Freshness** — `exp(-age_days/30)`.
-3. **Lane score:** `Graph_score = 0.60·NeighborNovelty + 0.30·MultiSeedSupport + 0.10·Freshness`.
+3. **Lane score:** `Graph_score = 0.60·NeighborNovelty + 0.40·MultiSeedSupport`.
 4. **Within-lane MMR** (λ≈0.7); keep shortlist ≈ **80**.
 
 ### 4) Cross-lane dedupe (deterministic, OS-wins)
@@ -263,7 +262,3 @@ Lane CTRs, under-fill rates, cross-lane overlap removed, post-MMR diversity by t
 
 * A seed is “supported” if the candidate has **any** of that seed’s neighbors with membership ≥ 0.15.
 * `MultiSeedSupport = (# supported seeds) / (total seeds)`.
-
-### Freshness — newness nudge
-
-* `Freshness = exp(- age_days / 30)`.
