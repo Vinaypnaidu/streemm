@@ -1,26 +1,26 @@
-# Video Intelligence MVP — Final Design Doc (Frozen)
+# Video Intelligence – Design Doc
 
-## 1) Frozen Data Spec (lean, with 1–2 line descriptions)
+## 1) Data Spec
 
-**Entities —** named things mentioned in the video (people, orgs, products, places, ideas). De-duplicated by `canonical_name`; `importance` expresses how central the entity is to this video.
+**Entities –** named things mentioned in the video (people, orgs, products, places, ideas). De-duplicated by `canonical_name`; `importance` expresses how central the entity is to this video.
 
 ```json
 { "id": "uuid", "name": "string", "canonical_name": "string", "importance": 0.0 }
 ```
 
-**Topics —** concrete subjects/skills covered by the video (e.g., “pasta making”, “gradient descent”). `prominence` reflects share of focus/time.
+**Topics –** concrete subjects/skills covered by the video (e.g., "pasta making", "gradient descent"). `prominence` reflects share of focus/time.
 
 ```json
 { "id": "uuid", "name": "string", "canonical_name": "string", "prominence": 0.0 }
 ```
 
-**Tags —** searchable labels derived from topics, entities, and overall content nature; mix domain/field, format/style, and key attributes for discovery.
+**Tags –** searchable labels derived from topics, entities, and overall content nature; mix domain/field, format/style, and key attributes for discovery.
 
 ```json
 { "id": "uuid", "name": "string", "canonical_name": "string", "weight": 0.0 }
 ```
 
-**Metadata —** minimal coarse descriptors used for filtering and feed rules.
+**Metadata –** minimal coarse descriptors used for filtering and feed rules.
 
 ```json
 {
@@ -29,13 +29,13 @@
 }
 ```
 
-**Summary —** summary of the video (2–4 sentences max) used in UI and as input to embedding.
+**Summary –** summary of the video (2–4 sentences max) used in UI and as input to embedding.
 
 ```json
 { "short_summary": "string" }
 ```
 
-**Embeddings —** single video-level vector powering semantic recall and similarity-based recommendations.
+**Embeddings –** single video-level vector powering semantic recall and similarity-based recommendations.
 
 ```json
 { "model": "string", "dim": 0, "video": [0.0] }
@@ -43,7 +43,7 @@
 
 ---
 
-## 2) Embedding Document (what we embed, ≤ ~600 tokens)
+## 2) Embedding Document (what we embed, ~250 tokens)
 
 ```
 Title: {title}
@@ -82,9 +82,8 @@ Metadata: content_type={one of enum}, language={en}
 * `video_topics(video_id, topic_id)` **UNIQUE** and `video_topics(topic_id, video_id)` (btree)
 * `video_entities(video_id, entity_id)` **UNIQUE** and `video_entities(entity_id, video_id)` (btree)
 * `video_tags(video_id, tag_id)` **UNIQUE** and `video_tags(tag_id, video_id)` (btree)
-* Optional: `video_topics(topic_id, prominence)`, `video_entities(entity_id, importance)`, `video_tags(tag_id, weight)`, `videos(content_type)`, `videos(language)`
 
-### 3.2 OpenSearch (per-video doc; denormalized; kNN enabled)
+### 3.2 OpenSearch (per-video doc; denormalized; BM25 + stored embeddings)
 
 (Include index-only fields + vector; **do not index summary**.)
 
@@ -115,10 +114,10 @@ Metadata: content_type={one of enum}, language={en}
 
 * `title`, `description` as `text` **with** `.keyword` subfields (for exact filters/aggs).
 * `entities`, `topics`, and `tags` as **`nested`** objects; within each, map `name` as `text` + `.keyword`, `canonical_name` as `keyword`, numeric weights as `float`.
-* `embedding` as **`knn_vector`** (HNSW).
+* `embedding` as a plain `float` array stored in `_source` (not indexed; used for cosine reranking only).
 
 **BM25 fields (and boosts):**
-`title^3, description^2, tags.name^2, topics.name^1, entities.name^1`
+`title^3, description^2, tags.name^2, entities.name^2, topics.name^1`
 
 ### 3.3 Neo4j Graph Layer (bipartite, lean)
 
@@ -135,7 +134,7 @@ Metadata: content_type={one of enum}, language={en}
 
 * `(:Video)-[:HAS_TOPIC { prominence: Float }]->(:Topic)`
 * `(:Video)-[:HAS_ENTITY { importance: Float }]->(:Entity)`
-* `(:Video)-[:HAS_TAG   { weight:     Float }]->(:Tag)`
+* `(:Video)-[:HAS_TAG { weight: Float }]->(:Tag)`
 
 **Constraints / required properties**
 
@@ -163,102 +162,90 @@ Metadata: content_type={one of enum}, language={en}
 
 ---
 
-## 5) Recommendations — Two-Lane (Lean, OS ≠ Graph)
+## 5) Recommendations – Two-Lane
 
-**Why two lanes (don’t mix):**
-We run **OpenSearch** and **Graph** independently because they optimize *different* objectives. OS excels at **similarity** (semantic + keyword). Graph excels at **adjacency/serendipity** (nearby-but-new). Mixing recall or scores blurs those goals; instead we keep lanes separate, **dedupe in favor of OS** (freeing Graph capacity for novel picks), enforce a **60/40** blend, then do a single global MMR for a pleasant final order.
+**Why two lanes:**
+We run **OpenSearch** and **Graph** independently because they optimize *different* objectives. OS excels at **similarity** (semantic + keyword). Graph excels at **adjacency/serendipity** (nearby-but-new). Mixing recall or scores blurs those goals; instead we keep lanes separate, **dedupe in favor of OS** (freeing Graph capacity for novel picks), enforce a **70/30** blend, then do a single global MMR for a pleasant final order.
 
 ### 0) Knobs (defaults)
 
 * **Target N:** 100
-* **History depth:** last **25** watched videos
-* **Lane quotas:** OS = **60**, Graph = **40** (redistribute if a lane under-fills)
-* **OS recall caps:** **BM25@1000**
-* **Graph recall caps:** **1-hop@200**, **2-hop@200** (both mandatory)
-* **Within-lane MMR:** λ≈0.7 (diversify by topics/entities/tags via Jaccard similarity)
-* **No uploader rules** (diversity via MMR only)
+* **History depth:** last **50** watched videos
+* **Lane quotas:** OS = **70**, Graph = **30** (redistribute if a lane under-fills)
+* **OS recall caps:** **BM25@500**
+* **Graph recall caps:** **Random walks → all unique videos, early dedupe, then filter**
+* **Within-lane MMR:** λ = **0.7** (diversify by topics/entities/tags via Jaccard similarity)
+* **OS scoring weights:** cosine = **0.5**, BM25 = **0.5**
 
 ### 1) Build user signal
 
-* **User vector `u`:** recency-weighted mean of the last **25** `video_vector`s (normalize).
-* **User seeds:** top **topics, entities, tags** from those videos with weights (`prominence` / `importance` / `weight`), e.g., ≤10 each.
+* **User vector `u`:** recency-weighted mean of the last **50** `video_vector`s (normalize).
+* **User seeds:** top entities and tags from those videos with weights (`importance` / `weight`), specifically **15 entities** and **20 tags** and **5 topics**.
 
 ### 2) OS lane (OpenSearch: BM25 recall + semantic rerank)
 
-1. **Recall (BM25-first):** BM25(1000) using seed names over **BM25 fields**:
-  `title^3, description^2, tags.name^2, topics.name^1, entities.name^1`.
+1. **Recall (BM25-first):** BM25(500) using user seeds
+    - **BM25 fields**: `title^3, description^2, tags.name^2, entities.name^2, topics.name^1`
+    - Seeds: **15 entities** + **20 tags** + **5 topics** = **40 seeds**
 2. **Semantic reranking:** For the recalled set only, compute cosine similarity between the **user vector `u`** and each candidate's embedding; normalize cosine and BM25 to [0,1] → `cos_norm`, `bm25_norm`.
 3. **Lane score:** `OS_score = 0.50·cos_norm + 0.50·bm25_norm`; sort by this score.
-4. **Within-lane MMR** (λ≈0.7), similarity = **Jaccard over entities + tags**; keep shortlist ≈ **2× OS lane quota** (default 120).
+4. **Within-lane MMR** (λ = 0.7), similarity = **Jaccard over entities + tags**; keep shortlist ≈ **2× OS lane quota** (default 140).
 
-### 3) Graph lane (Neo4j: adjacency/serendipity; **1-hop & 2-hop mandatory**)
+### 3) Graph lane (Neo4j: Random Walk-based adjacency/serendipity)
 
-1. **Recall:**
+1. **Recall (Random Walks):**
 
-   * **1-hop (200):** seeds (topics/entities/tags) → videos via `HAS_*`.
-   * **2-hop (200):** seeds → **neighbors** (co-occurrence over videos) → videos with those neighbors (per modality: Topic→Video→Topic, Entity→Video→Entity, Tag→Video→Tag).
-   * **Union & dedupe** inside lane.
-2. **Features (all ∈[0,1]):**
+   * Run random walks using **`gds.randomWalk.stream`** from seed nodes (entities and tags only).
+   * **Walk parameters:** 
+     - Seeds: **15 entities** + **20 tags** = **35 seeds**
+     - `walkLength`: **7** steps
+     - `walksPerNode`: **50** walks per seed
+     - `relationshipWeightProperty`: use `importance`/`weight` from edges for biased walks
+     - **Total walks:** 35 seeds × 50 = **1,750 walks**
+   * Count video visit frequencies across all walks.
+   * Collect all unique videos with their visit counts.
 
-   * **NeighborNovelty** *(see below)* — how much the candidate contains **neighbors of the seeds** (not the seeds).
-   * **MultiSeedSupport** *(see below)* — fraction of distinct seeds with **≥1 neighbor** present in the candidate.
-3. **Lane score:** `Graph_score = 0.60·NeighborNovelty + 0.40·MultiSeedSupport`.
-4. **Within-lane MMR** (λ≈0.7); keep shortlist ≈ **80**.
+2. **Early deduplication:**
 
-### 4) Cross-lane dedupe (deterministic, OS-wins)
+   * Remove any videos that appear in the **OS lane's top 140** (2× OS quota).
+   * Rationale: OS lane already captured semantically similar content; graph lane's job is to surface adjacent-but-different content.
 
-If a `video_id` appears in both shortlists, **keep it in OS** and **remove it from Graph**.
-*(Optionally tag the OS item with `graph_support=true` for analytics/explanations.)*
+3. **Semantic distance filtering:**
 
-### 5) Quota fill (60/40) + backfill
+   * For each remaining candidate, compute cosine similarity with user vector `u`.
+   * **Filter:** keep only candidates with cosine similarity ∈ **[0.1, 0.9]** (lenient bounds as tuning knobs).
+     - Lower bound (0.1): exclude completely unrelated content
+     - Upper bound (0.9): exclude near-duplicates of history
+   * **Semantic distance** = `1 - cosine_norm`
 
-Take **60** from the OS shortlist and **40** from the Graph shortlist. If a lane under-fills, backfill from the other lane’s next best.
+4. **Lane score:** 
+   ```
+   Graph_score = semantic_distance
+   ```
+   Rationale: Random walks provide connectivity (visit frequency), early dedupe ensures novelty from OS lane, cosine filtering provides relevance bounds. Final ranking optimizes purely for content difference to maximize serendipity.
+
+5. **Within-lane MMR** (λ = 0.7); keep shortlist ≈ **60**.
+
+6. **Under-fill handling:** If filtered candidates < 60, widen cosine bounds (e.g., [0.05, 0.95]) or accept under-fill and backfill from OS lane.
+
+### 4) Cross-lane dedupe (already handled)
+
+Early deduplication in the graph lane (step 2) removes overlap with OS lane's top 140. No additional cross-lane deduping needed.
+*(Optionally tag any OS items that also appeared in graph walks with `graph_support=true` for analytics.)*
+
+### 5) Quota fill (70/30) + backfill
+
+Take **70** from the OS shortlist and **30** from the Graph shortlist. If a lane under-fills, backfill from the other lane's next best.
 
 ### 6) Global MMR (final ordering only)
 
-Run one global MMR across the **100** selected videos to interleave and diversify (use lane scores as relevance; similarity from embeddings + topics/entities/tags). **Preserve the 60/40 counts**—this step only reorders.
+Run one global MMR across the **100** selected videos to interleave and diversify (use lane scores as relevance; similarity from embeddings + topics/entities/tags). **Preserve the 70/30 counts**—this step only reorders.
 
 ### 7) Explanations
 
-* **OS pick:** “Semantic match to your history; aligns with **{Topic/Entity/Tag}**.”
-* **Graph pick:** “Related via your interests (adjacent to **{Seed → Neighbor}**).”
+* **OS pick:** "Semantic match to your history; aligns with **{Topic/Entity/Tag}**."
+* **Graph pick:** "Discovered through your interests in **{Seed}**—a fresh take you might enjoy."
 
 ### 8) Useful counters (to tune later)
 
-Lane CTRs, under-fill rates, cross-lane overlap removed, post-MMR diversity by topics/entities/tags.
-
----
-
-## Graph features, definitions & examples
-
-### Inputs we have
-
-* **History:** last **25** watched videos with timestamps.
-* **Per video:** topics (`prominence`), entities (`importance`), **tags (`weight`)**.
-* **Graph:** `Video -[:HAS_* {weight}]-> (Topic|Entity|Tag)`.
-
-### Seed weights
-
-* Recency per video: `w_i = exp(- age_days_i / 14)`.
-* Scores:
-
-  * Topic: `score_t = Σ_i (w_i * prominence_{i,t})`
-  * Entity: `score_e = Σ_i (w_i * importance_{i,e})`
-  * Tag:   `score_g = Σ_i (w_i * weight_{i,g})`
-* Normalize per modality to sum to 1; keep top ~10 per modality as seeds.
-
-### Neighbor strengths (per seed)
-
-* For each seed (topic/entity/tag), traverse **2 hops** within same modality: Seed → Video → Neighbor.
-* Accumulate `raw_strength += (membership_on_video_of_seed) * (membership_on_video_of_neighbor)`.
-* Drop self, keep top ~20 neighbors; **normalize per seed** so strengths sum to 1.
-
-### NeighborNovelty — related-but-new
-
-* Merge neighbors across **all** seeds (weighted by seed weight × neighbor strength), normalize to a global `W[n]`.
-* Candidate score = Σ ( `W[n] * candidate_membership_for_n` ).
-
-### MultiSeedSupport — convergent novelty
-
-* A seed is “supported” if the candidate has **any** of that seed’s neighbors with membership ≥ 0.15.
-* `MultiSeedSupport = (# supported seeds) / (total seeds)`.
+Lane CTRs, under-fill rates, early dedupe overlap (how many graph candidates removed by OS), post-MMR diversity by topics/entities/tags, walk parameter sensitivity (walkLength, walksPerNode), cosine bound effectiveness, visit count distribution from walks.

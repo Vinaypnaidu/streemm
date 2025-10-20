@@ -65,14 +65,14 @@ class Settings:
         self.neo4j_username = os.getenv("NEO4J_USERNAME", "neo4j")
         self.neo4j_password = os.getenv("NEO4J_PASSWORD", "Vinay@neo4j")
         self.neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
-        self.neo4j_prominence_insert_th = float(os.getenv("NEO4J_PROMINENCE_INSERT_TH", "0.50"))
-        self.neo4j_importance_insert_th = float(os.getenv("NEO4J_IMPORTANCE_INSERT_TH", "0.50"))
-        self.neo4j_tag_weight_insert_th = float(os.getenv("NEO4J_TAG_WEIGHT_INSERT_TH", "0.50"))
+        self.neo4j_prominence_insert_th = float(os.getenv("NEO4J_PROMINENCE_INSERT_TH", "0.8"))
+        self.neo4j_importance_insert_th = float(os.getenv("NEO4J_IMPORTANCE_INSERT_TH", "0.8"))
+        self.neo4j_tag_weight_insert_th = float(os.getenv("NEO4J_TAG_WEIGHT_INSERT_TH", "0.8"))
 
         # OpenSearch (index thresholds)
-        self.opensearch_topic_prominence_th = float(os.getenv("OPENSEARCH_TOPIC_PROMINENCE_TH", "0.50"))
-        self.opensearch_entity_importance_th = float(os.getenv("OPENSEARCH_ENTITY_IMPORTANCE_TH", "0.50"))
-        self.opensearch_tag_weight_th = float(os.getenv("OPENSEARCH_TAG_WEIGHT_TH", "0.50"))
+        self.opensearch_topic_prominence_th = float(os.getenv("OPENSEARCH_TOPIC_PROMINENCE_TH", "0.8"))
+        self.opensearch_entity_importance_th = float(os.getenv("OPENSEARCH_ENTITY_IMPORTANCE_TH", "0.8"))
+        self.opensearch_tag_weight_th = float(os.getenv("OPENSEARCH_TAG_WEIGHT_TH", "0.8"))
 
         # Email / SMTP
         self.email_enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"

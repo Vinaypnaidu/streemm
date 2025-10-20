@@ -107,7 +107,7 @@ def _ensure_videos_index(client: OpenSearch) -> None:
             "number_of_replicas": 0,
             "refresh_interval": "1s",
             "index": {
-                "knn": True,
+                "knn": False,
             },
         },
         "mappings": {
@@ -128,13 +128,9 @@ def _ensure_videos_index(client: OpenSearch) -> None:
                 "user_id": {"type": "keyword"},
                 "status": {"type": "keyword"},
                 "embedding": {
-                    "type": "knn_vector",
-                    "dimension": 1536,
-                    "method": {
-                        "name": "hnsw",
-                        "engine": "nmslib",
-                        "space_type": "cosinesimil",
-                    },
+                    "type": "float",
+                    "index": False,
+                    "doc_values": False
                 },
                 "topics": {
                     "type": "nested",
