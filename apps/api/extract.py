@@ -77,11 +77,6 @@ def _client() -> Optional[OpenAI]:
     return OpenAI(api_key=settings.openai_api_key)
 
 
-def _clip(s: str, max_chars: int) -> str:
-    s = s.strip()
-    return s[:max_chars]
-
-
 def _build_transcript_text(chunks: List[Dict[str, Any]], max_chars: int) -> str:
     buf: List[str] = []
     total = 0
@@ -162,7 +157,6 @@ def _normalize_result(raw: Dict[str, Any]) -> ExtractResult:
         seen.add(cn)
         entities_norm.append(it)
 
-    # Tags: normalize and dedupe by canonical tag string
     items_tags = []
     for it in (raw.get("tags") or []):
         try:

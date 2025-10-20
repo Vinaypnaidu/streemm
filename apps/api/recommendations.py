@@ -583,26 +583,18 @@ def _candidate_similarity(a: OSCandidate, b: OSCandidate) -> float:
     """
     def to_tokens(doc: Dict[str, Any]) -> Set[str]:
         tokens: Set[str] = set()
-        # Entities can be list[dict] or list[str]
+        # Entities are stored as list[dict]
         for e in doc.get("entities", []) or []:
             if isinstance(e, dict):
                 val = (e.get("canonical_name") or e.get("name") or "").strip()
                 if val:
                     tokens.add(val.lower())
-            elif isinstance(e, str):
-                s = e.strip().lower()
-                if s:
-                    tokens.add(s)
-        # Tags can be list[str] or list[dict]
+        # Tags are stored as list[dict]
         for t in doc.get("tags", []) or []:
             if isinstance(t, dict):
                 val = (t.get("canonical_name") or t.get("name") or "").strip()
                 if val:
                     tokens.add(val.lower())
-            elif isinstance(t, str):
-                s = t.strip().lower()
-                if s:
-                    tokens.add(s)
         return tokens
 
     a_tokens = to_tokens(a.document)
