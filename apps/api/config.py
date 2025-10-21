@@ -74,6 +74,28 @@ class Settings:
         self.opensearch_entity_importance_th = float(os.getenv("OPENSEARCH_ENTITY_IMPORTANCE_TH", "0.75"))
         self.opensearch_tag_weight_th = float(os.getenv("OPENSEARCH_TAG_WEIGHT_TH", "0.75"))
 
+        # Recommendations
+        self.history_depth = int(os.getenv("HISTORY_DEPTH", 50))
+        self.recency_half_life_days = float(os.getenv("RECENCY_HALF_LIFE_DAYS", 21))
+
+        self.max_tag_seeds = int(os.getenv("MAX_TAG_SEEDS", 20))
+        self.max_entity_seeds = int(os.getenv("MAX_ENTITY_SEEDS", 15))
+        self.max_topic_seeds = int(os.getenv("MAX_TOPIC_SEEDS", 5))
+
+        self.target_total_recommendations = int(os.getenv("TARGET_TOTAL_RECOMMENDATIONS", 100))
+        self.os_lane_quota = int(os.getenv("OS_LANE_QUOTA", 70))
+        self.graph_lane_quota = int(os.getenv("GRAPH_LANE_QUOTA", 30))
+        self.mmr_lambda = float(os.getenv("MMR_LAMBDA", 0.7))
+
+        self.os_bm25_recall_k = int(os.getenv("OS_BM25_RECALL_K", 500))
+        self.os_cosine_weight = float(os.getenv("OS_COSINE_WEIGHT", 0.5))
+        self.os_bm25_weight = float(os.getenv("OS_BM25_WEIGHT", 0.5))
+
+        self.graph_walk_length = int(os.getenv("GRAPH_WALK_LENGTH", 7))
+        self.graph_walks_per_node = int(os.getenv("GRAPH_WALKS_PER_NODE", 50))
+        self.graph_cosine_min = float(os.getenv("GRAPH_COSINE_MIN", 0.1))
+        self.graph_cosine_max = float(os.getenv("GRAPH_COSINE_MAX", 0.9))
+
         # Email / SMTP
         self.email_enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
         self.email_from = os.getenv("EMAIL_FROM", "no-reply@streem.local")

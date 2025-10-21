@@ -11,6 +11,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from opensearchpy import OpenSearch
 
+from config import settings
 from search import VIDEOS_INDEX, ensure_indexes, get_client
 from graph import get_driver as get_neo4j_driver, ensure_constraints as ensure_graph_constraints
 from models import (
@@ -25,28 +26,28 @@ from models import (
 )
 
 # Recommendation configuration
-HISTORY_DEPTH = 50
-RECENCY_HALF_LIFE_DAYS = 21
+HISTORY_DEPTH = settings.history_depth      
+RECENCY_HALF_LIFE_DAYS = settings.recency_half_life_days
 
-MAX_TAG_SEEDS = 20
-MAX_ENTITY_SEEDS = 15
-MAX_TOPIC_SEEDS = 5
+MAX_TAG_SEEDS = settings.max_tag_seeds
+MAX_ENTITY_SEEDS = settings.max_entity_seeds
+MAX_TOPIC_SEEDS = settings.max_topic_seeds
 
-TARGET_TOTAL_RECOMMENDATIONS = 100
-OS_LANE_QUOTA = 70
-GRAPH_LANE_QUOTA = 30
-MMR_LAMBDA = 0.7
+TARGET_TOTAL_RECOMMENDATIONS = settings.target_total_recommendations
+OS_LANE_QUOTA = settings.os_lane_quota
+GRAPH_LANE_QUOTA = settings.graph_lane_quota
+MMR_LAMBDA = settings.mmr_lambda
 
 # OpenSearch lane tuning
-OS_BM25_RECALL_K = 500
-OS_COSINE_WEIGHT = 0.5
-OS_BM25_WEIGHT = 0.5
+OS_BM25_RECALL_K = settings.os_bm25_recall_k
+OS_COSINE_WEIGHT = settings.os_cosine_weight
+OS_BM25_WEIGHT = settings.os_bm25_weight
 
 # Graph lane tuning
-GRAPH_WALK_LENGTH = 7
-GRAPH_WALKS_PER_NODE = 50
-GRAPH_COSINE_MIN = 0.1
-GRAPH_COSINE_MAX = 0.9
+GRAPH_WALK_LENGTH = settings.graph_walk_length
+GRAPH_WALKS_PER_NODE = settings.graph_walks_per_node
+GRAPH_COSINE_MIN = settings.graph_cosine_min
+GRAPH_COSINE_MAX = settings.graph_cosine_max
 
 BM25_TOP_LEVEL_FIELDS = [
     "title^3",
@@ -1034,10 +1035,9 @@ def _generate_os_explanation(
     entity_match, tag_match = _find_best_matches(candidate_doc, seed_bundle)
     
     if entity_match and tag_match:
-        formatted_entity = entity_match.title()
-        return f"Features {formatted_entity} — matches your {tag_match} interests"
+        return f"About {entity_match.title()} — matches your {tag_match} interests"
     elif entity_match:
-        return f"Matches your interest in {entity_match}"
+        return f"Matches your interest in {entity_match.title()}"
     elif tag_match:
         return f"Matches your {tag_match} interests"
     else:

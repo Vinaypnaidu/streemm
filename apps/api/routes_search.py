@@ -69,20 +69,89 @@ def _normalize_tokens(text: str) -> List[str]:
 
 
 def _build_meta_query(q: str, limit: int, offset: int) -> Dict[str, Any]:
+    """
+    Build BM25 query for metadata search across title, description, entities, tags, and topics.
+    Uses nested queries for structured fields with appropriate boost values.
+    """
     return {
         "from": offset,
         "size": limit,
         "query": {
-            "multi_match": {
-                "query": q,
-                "fields": ["title", "description"],
-                "type": "best_fields",
+            "bool": {
+                "should": [
+                    {
+                        "multi_match": {
+                            "query": q,
+                            "fields": ["title^1", "description^1"],
+                            "type": "best_fields",
+                        }
+                    },
+                    {
+                        "nested": {
+                            "path": "entities",
+                            "score_mode": "max",
+                            "query": {
+                                "match": {
+                                    "entities.name": {
+                                        "query": q,
+                                        "operator": "or",
+                                    }
+                                }
+                            },
+                            "boost": 1.0,
+                        }
+                    },
+                    {
+                        "nested": {
+                            "path": "tags",
+                            "score_mode": "max",
+                            "query": {
+                                "match": {
+                                    "tags.name": {
+                                        "query": q,
+                                        "operator": "or",
+                                    }
+                                }
+                            },
+                            "boost": 1.0,
+                        }
+                    },
+                    {
+                        "nested": {
+                            "path": "topics",
+                            "score_mode": "max",
+                            "query": {
+                                "match": {
+                                    "topics.name": {
+                                        "query": q,
+                                        "operator": "or",
+                                    }
+                                }
+                            },
+                            "boost": 1.0,
+                        }
+                    },
+                ],
+                "minimum_should_match": 1,
+                "filter": [
+                    {
+                        "term": {
+                            "status": "ready",
+                        }
+                    }
+                ],
             }
         },
         "highlight": {
             "pre_tags": ["<em>"],
             "post_tags": ["</em>"],
-            "fields": {"title": {}, "description": {}},
+            "fields": {
+                "title": {},
+                "description": {},
+                "entities.name": {},
+                "tags.name": {},
+                "topics.name": {},
+            },
         },
     }
 
@@ -160,6 +229,7 @@ def search(
                     "description_html": (
                         desc_html[0] if desc_html else (src.get("description") or "")
                     ),
+                    "short_summary": src.get("short_summary"),
                     "thumbnail_url": src.get("thumbnail_url"),
                     "created_at": src.get("created_at"),
                     "duration_seconds": src.get("duration_seconds"),
@@ -232,7 +302,7 @@ def search(
 
             content_terms = [t for t in tokens if t not in STOPWORDS and len(t) > 2]
             if content_terms:
-                # Soft guard: require at least one non-glue term to match using a dis_max term set.
+                # Soft guard: require at least 1 non-glue terms to match using a dis_max term set.
                 bool_query.setdefault("should", []).append(
                     {
                         "dis_max": {

@@ -6,7 +6,7 @@ def _build_prompt(title: str, description: str, transcript_text: str) -> str:
 **STEP 1:** Determine the content_type first — this will guide your entire extraction strategy.
 
 **STEP 2:** Based on the content type, extract:
-- **Summary** — objective 2-4 sentence description
+- **Summary** — objective 2-3 sentence description
 - **Topics** — what the video is about: key subjects (skills, concepts, techniques, etc.) that receive substantial focus
 - **Entities** — specific instances and key things central to the video (people, organizations, products, concepts, events etc.)
 - **Tags** — searchable labels derived from topics, entities, and video nature
@@ -57,7 +57,7 @@ Now that you know the content type, extract the following fields:
 
 ## 1. Summary (`short_summary`)
 
-- **2-4 sentences** maximum
+- **2-3 sentences** maximum
 - Objective, factual description of what the video covers
 - Focus on the PRIMARY content, not minor tangents
 - No marketing language or subjective claims
@@ -223,7 +223,7 @@ Return **valid JSON only** (no markdown, no explanation).
     "content_type": "educational|entertainment|review|interview|news|lifestyle|other",
     "language": "en"
   }},
-  "short_summary": "2-4 sentences objectively describing what this video covers and its primary focus",
+  "short_summary": "2-3 sentences objectively describing what this video covers and its primary focus",
   "topics": [
     {{"name": "Display Name", "canonical_name": "lowercase normalized", "prominence": 0.0}}
   ],

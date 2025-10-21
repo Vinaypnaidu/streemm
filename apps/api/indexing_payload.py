@@ -69,6 +69,7 @@ def build_video_search_document(
     doc: Dict[str, Any] = {
         "title": bundle.title,
         "description": bundle.description,
+        "short_summary": bundle.summary,
         "content_type": bundle.content_type,
         "language": bundle.language,
         "duration_seconds": duration,

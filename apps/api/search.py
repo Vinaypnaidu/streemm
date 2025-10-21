@@ -120,6 +120,10 @@ def _ensure_videos_index(client: OpenSearch) -> None:
                     "type": "text",
                     "fields": {"raw": {"type": "keyword", "ignore_above": 512}},
                 },
+                "short_summary": {
+                    "type": "text",
+                    "index": False,
+                },
                 "content_type": {"type": "keyword"},
                 "language": {"type": "keyword"},
                 "duration_seconds": {"type": "float"},

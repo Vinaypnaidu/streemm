@@ -12,6 +12,7 @@ type MetaItem = {
   video_id: string;
   title_html: string;
   description_html: string;
+  short_summary?: string | null;
   thumbnail_url?: string | null;
   created_at?: string | null;
   duration_seconds?: number | null;
@@ -54,8 +55,12 @@ function ProgressBar({ percent }: { percent: number }) {
 
 function fmtTime(s: number) {
   const sec = Math.max(0, Math.floor(s || 0));
-  const m = Math.floor(sec / 60),
-    r = sec % 60;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const r = sec % 60;
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, "0")}:${r.toString().padStart(2, "0")}`;
+  }
   return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
@@ -142,9 +147,7 @@ export default function SearchPage() {
   const tx = data?.transcript?.items || [];
 
   return (
-    <div className="px-12 py-8">
-      <h1 className="text-3xl font-semibold mb-6">Search results</h1>
-
+    <div className="px-8 py-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Left: metadata results */}
         <section>
@@ -164,10 +167,10 @@ export default function SearchPage() {
                         <img
                           src={it.thumbnail_url}
                           alt=""
-                          className="w-64 aspect-video object-cover rounded-md"
+                          className="w-80 aspect-video object-cover rounded-md"
                         />
                       ) : (
-                        <div className="w-64 aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">
+                        <div className="w-80 aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">
                           No thumbnail
                         </div>
                       )}
@@ -175,11 +178,21 @@ export default function SearchPage() {
                     <div className="min-w-0 flex-1 pr-4">
                       <Link
                         href={`/videos/${it.video_id}`}
-                        className="block font-medium text-sm hover:underline line-clamp-2"
+                        className="block font-medium text-sm hover:underline line-clamp-2 mb-1.5"
                         dangerouslySetInnerHTML={{
                           __html: it.title_html || "",
                         }}
                       />
+                      {it.duration_seconds && (
+                        <p className="text-xs text-neutral-500 mt-1">
+                          {fmtTime(it.duration_seconds)}
+                        </p>
+                      )}
+                      {it.short_summary && (
+                        <p className="text-xs text-neutral-400 mt-2 line-clamp-6">
+                          {it.short_summary}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -215,10 +228,10 @@ export default function SearchPage() {
                           <img
                             src={it.thumbnail_url}
                             alt=""
-                            className="w-64 aspect-video object-cover rounded-md"
+                            className="w-80 aspect-video object-cover rounded-md"
                           />
                         ) : (
-                          <div className="w-64 aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">
+                          <div className="w-80 aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">
                             No thumbnail
                           </div>
                         )}
