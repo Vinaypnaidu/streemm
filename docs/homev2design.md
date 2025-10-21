@@ -213,9 +213,9 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
 3. **Cosine similarity filtering:**
 
    * For each remaining candidate, compute cosine similarity with user vector `u`.
-   * **Filter:** keep only candidates with cosine similarity ∈ **[0.15, 0.85]** (lenient bounds as tuning knobs).
-     - Lower bound (0.15): exclude completely unrelated content
-     - Upper bound (0.85): exclude near-duplicates of history
+   * **Filter:** keep only candidates with cosine similarity ∈ **[0.1, 0.9]** (lenient bounds as tuning knobs).
+     - Lower bound (0.1): exclude completely unrelated content
+     - Upper bound (0.9): exclude very similar content
 
 4. **Lane score:** 
    ```

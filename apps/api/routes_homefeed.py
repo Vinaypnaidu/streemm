@@ -10,7 +10,7 @@ from db import get_db
 from session import get_current_user
 from models import User, Video, WatchHistory
 from schemas import HomeFeedItem, HomeFeedResponse
-from recommendations import build_seed_bundle, run_graph_lane
+from recommendations import get_recommendations
 from search import ensure_indexes
 from storage import build_thumbnail_key, build_public_url
 
@@ -48,29 +48,6 @@ def _compute_progress_map(
     return progress
 
 
-def _make_items_from_videos(
-    vids: List[Video], progress: Dict[str, Optional[float]], source: str
-) -> HomeFeedResponse:
-    items: List[HomeFeedItem] = []
-    for v in vids:
-        thumb_url = build_public_url(build_thumbnail_key(str(v.id)))
-        items.append(
-            HomeFeedItem(
-                id=str(v.id),
-                title=(v.title or "").strip() or v.original_filename,
-                description=(v.description or "").strip(),
-                thumbnail_url=thumb_url,
-                duration_seconds=(
-                    float(v.duration_seconds)
-                    if v.duration_seconds is not None
-                    else None
-                ),
-                progress_percent=progress.get(str(v.id)),
-            )
-        )
-    return HomeFeedResponse(items=items, source=source)
-
-
 def _empty_response() -> HomeFeedResponse:
     return HomeFeedResponse(items=[], source="empty")
 
@@ -82,18 +59,52 @@ def homefeed(
 ):
     ensure_indexes()
 
-    seeds = build_seed_bundle(db, user.id)
-    lane = run_graph_lane(seeds)
+    # Use the orchestrator to blend both lanes
+    result = get_recommendations(db, user.id)
 
-    ids = [c.video_id for c in lane.shortlist]
-    if not ids:
+    if not result.video_ids:
         return _empty_response()
 
-    vids = db.query(Video).filter(Video.id.in_(ids), Video.status == "ready").all()
+    # Fetch videos from database
+    vids = db.query(Video).filter(
+        Video.id.in_(result.video_ids),
+        Video.status == "ready"
+    ).all()
+    
+    # Build lookup and preserve order from recommendation result
     by_id = {str(v.id): v for v in vids}
-    ordered: List[Video] = [by_id[i] for i in ids if i in by_id]
+    ordered: List[Video] = [by_id[vid] for vid in result.video_ids if vid in by_id]
+    
     if not ordered:
         return _empty_response()
 
+    # Compute progress for all videos
     progress = _compute_progress_map(db, user, [str(v.id) for v in ordered])
-    return _make_items_from_videos(ordered, progress, "graph_lane")
+    
+    # Build response items with source metadata
+    items: List[HomeFeedItem] = []
+    for v in ordered:
+        vid_str = str(v.id)
+        thumb_url = build_public_url(build_thumbnail_key(vid_str))
+        
+        # Determine source for this video
+        source = result.sources.get(vid_str, "unknown")
+        
+        items.append(
+            HomeFeedItem(
+                id=vid_str,
+                title=(v.title or "").strip() or v.original_filename,
+                description=(v.description or "").strip(),
+                thumbnail_url=thumb_url,
+                duration_seconds=(
+                    float(v.duration_seconds)
+                    if v.duration_seconds is not None
+                    else None
+                ),
+                progress_percent=progress.get(vid_str),
+            )
+        )
+    
+    # Use blended source with lane counts
+    source_label = f"blended(os={result.os_count},graph={result.graph_count})"
+    return HomeFeedResponse(items=items, source=source_label)

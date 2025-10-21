@@ -140,6 +140,22 @@ class GraphLaneResult:
     candidates: List[GraphCandidate]
 
 
+@dataclass
+class UnifiedCandidate:
+    video_id: str
+    lane_score: float
+    document: Dict[str, Any]
+    lane_source: str
+
+
+@dataclass
+class RecommendationResult:
+    video_ids: List[str]
+    sources: Dict[str, str]
+    os_count: int
+    graph_count: int
+
+
 def _recency_weight(last_watched_at: Optional[datetime], now: datetime) -> float:
     if last_watched_at is None:
         return 0.0
@@ -955,3 +971,112 @@ def _graph_hydrate_candidates_from_os(candidates: Sequence[GraphCandidate]) -> N
         src = by_id.get(c.video_id) or {}
         c.document = src
         c.embedding = _safe_get_embedding(src)
+
+
+def get_recommendations(
+    db: Session,
+    user_id: UUID,
+    target_count: int = TARGET_TOTAL_RECOMMENDATIONS,
+) -> RecommendationResult:
+    """
+    Orchestrate the two-lane recommendation system:
+    - Run OS lane (70%) and Graph lane (30%)
+    - Handle backfill if either lane under-delivers
+    - Apply global MMR for final ordering while preserving lane counts
+    - Attach lane-based source metadata
+    """
+    # Build user signal 
+    seed_bundle = build_seed_bundle(db, user_id)
+
+    # Run OS lane
+    os_result = run_opensearch_lane(seed_bundle)
+    os_shortlist = os_result.shortlist
+
+    # Extract top IDs from OS lane for graph exclusion (top 2x quota = 140)
+    os_top_ids = [c.video_id for c in os_shortlist[: 2 * OS_LANE_QUOTA]]
+
+    # Run Graph lane with OS exclusions
+    graph_result = run_graph_lane(seed_bundle, os_top_ids=os_top_ids)
+    graph_shortlist = graph_result.shortlist
+
+    # Determine lane quotas with backfill
+    os_available = len(os_shortlist)
+    graph_available = len(graph_shortlist)
+
+    os_quota = OS_LANE_QUOTA
+    graph_quota = GRAPH_LANE_QUOTA
+
+    # Handle under-delivery and backfill
+    if os_available < os_quota:
+        shortfall = os_quota - os_available
+        graph_quota = min(graph_quota + shortfall, graph_available)
+        os_quota = os_available
+    elif graph_available < graph_quota:
+        shortfall = graph_quota - graph_available
+        os_quota = min(os_quota + shortfall, os_available)
+        graph_quota = graph_available
+
+    # Select items from each lane
+    os_selected = os_shortlist[:os_quota]
+    graph_selected = graph_shortlist[:graph_quota]
+
+    log.info(
+        "recommendations_lane_selection os_quota=%d graph_quota=%d os_available=%d graph_available=%d",
+        os_quota, graph_quota, os_available, graph_available,
+    )
+
+    # Build unified candidate pool for global MMR
+    unified_pool: List[UnifiedCandidate] = []
+    
+    for c in os_selected:
+        unified_pool.append(
+            UnifiedCandidate(
+                video_id=c.video_id,
+                lane_score=c.lane_score,
+                document=c.document,
+                lane_source="os",
+            )
+        )
+    
+    for c in graph_selected:
+        unified_pool.append(
+            UnifiedCandidate(
+                video_id=c.video_id,
+                lane_score=c.lane_score,
+                document=c.document,
+                lane_source="graph",
+            )
+        )
+
+    # Apply global MMR for final ordering using existing similarity function
+    final_ordered = max_marginal_relevance(
+        unified_pool,
+        score_fn=lambda c: c.lane_score,
+        similarity_fn=_candidate_similarity,
+        limit=target_count,
+        lambda_weight=MMR_LAMBDA,
+    )
+
+    # Build result with source tracking
+    video_ids: List[str] = []
+    sources: Dict[str, str] = {}
+
+    for c in final_ordered:
+        video_ids.append(c.video_id)
+        sources[c.video_id] = c.lane_source
+
+    # Count actual lane representation in final results
+    final_os_count = sum(1 for s in sources.values() if s == "os")
+    final_graph_count = sum(1 for s in sources.values() if s == "graph")
+
+    log.info(
+        "recommendations_final_blend total=%d os=%d graph=%d",
+        len(video_ids), final_os_count, final_graph_count,
+    )
+
+    return RecommendationResult(
+        video_ids=video_ids,
+        sources=sources,
+        os_count=final_os_count,
+        graph_count=final_graph_count,
+    )
