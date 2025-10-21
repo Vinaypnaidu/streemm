@@ -153,7 +153,7 @@ Examples:
 - "Convolutional Neural Networks" topic → `deep-learning`, `computer-vision`, `ai`
 - "Pasta Making" topic → `cooking`, `italian-cuisine`, `food`
 - "Sourdough Baking" topic → `baking`, `bread`, `cooking`
-- "CSS Grid Layout" topic → `css`, `web-design`, `frontend`
+- "CSS Grid Layout" topic → `css`, `web development`, `frontend`
 - "HIIT Workouts" topic → `fitness`, `exercise`, `cardio`
 - "Stock Market Analysis" topic → `finance`, `investing`, `trading`
 
@@ -163,14 +163,15 @@ Examples:
 Extract **obvious categories and attributes** that describe the entities - do NOT simply convert entity names to tags.
 
 Examples:
-- "Gordon Ramsay" → `chef`, `celebrity`, `british` (NOT `gordon-ramsay`)
-- "TensorFlow" → `google`, `machine-learning`, `python` (NOT `tensorflow`)
-- "The Office" → `sitcom`, `mockumentary`, `nbc` (NOT `the-office`)
-- "iPhone 15" → `apple`, `smartphone`, `ios` (NOT `iphone-15`)
-- "React" → `javascript`, `facebook`, `web-development` (NOT `react`)
-- "World War II" → `war`, `history`, `1940s` (NOT `world-war-ii`)
+- "Gordon Ramsay" → `chef`, `cooking`, `celebrity` (NOT `gordon-ramsay`)
+- "TensorFlow" → `machine-learning`, `python`, `deep-learning` (NOT `tensorflow`)
+- "Breaking Bad" → `tv-series`, `drama`, `crime-thriller` (NOT `breaking-bad`)
+- "Python" → `programming`, `data-science` (NOT `python`)
+- "NASA" → `space`, `aerospace` (NOT `nasa`)
+- "Grand Canyon" → `national-park`, `nature`, `travel` (NOT `grand-canyon`)
+- "The Beatles" → `music`, `rock`, `band` (NOT `the-beatles`)
 
-**Ask yourself:** What type/category is this entity? Who made it? What domain does it belong to?
+**Ask yourself:** What type/category is this entity? What domain does it belong to? 
 
 ### C) From Video's Overall Content and Nature (Format, type, and presentation style)
 Describe **how the content is presented** - the video's format and structural characteristics, not what it's about.

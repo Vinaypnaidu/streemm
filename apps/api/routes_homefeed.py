@@ -10,7 +10,7 @@ from db import get_db
 from session import get_current_user
 from models import User, Video, WatchHistory
 from schemas import HomeFeedItem, HomeFeedResponse
-from recommendations import build_seed_bundle, run_opensearch_lane
+from recommendations import build_seed_bundle, run_graph_lane
 from search import ensure_indexes
 from storage import build_thumbnail_key, build_public_url
 
@@ -83,7 +83,7 @@ def homefeed(
     ensure_indexes()
 
     seeds = build_seed_bundle(db, user.id)
-    lane = run_opensearch_lane(seeds)
+    lane = run_graph_lane(seeds)
 
     ids = [c.video_id for c in lane.shortlist]
     if not ids:
@@ -96,4 +96,4 @@ def homefeed(
         return _empty_response()
 
     progress = _compute_progress_map(db, user, [str(v.id) for v in ordered])
-    return _make_items_from_videos(ordered, progress, "os_lane")
+    return _make_items_from_videos(ordered, progress, "graph_lane")

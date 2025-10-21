@@ -180,13 +180,13 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
 ### 1) Build user signal
 
 * **User vector `u`:** recency-weighted mean of the last **50** `video_vector`s (normalize).
-* **User seeds:** top entities and tags from those videos with weights (`importance` / `weight`), specifically **15 entities** and **20 tags** and **5 topics**.
+* **OS lane seeds:** top topics, entities, and tags from those videos with weights (`prominence` / `importance` / `weight`), specifically **5 topics**, **15 entities**, and **20 tags**.
+* **Graph lane seeds:** top entities and tags only, specifically **15 entities** and **20 tags**.
 
 ### 2) OS lane (OpenSearch: BM25 recall + semantic rerank)
 
-1. **Recall (BM25-first):** BM25(500) using user seeds
-    - **BM25 fields**: `title^3, description^2, tags.name^2, entities.name^2, topics.name^1`
-    - Seeds: **15 entities** + **20 tags** + **5 topics** = **40 seeds**
+1. **Recall (BM25-first):** BM25(500) using seed names over **BM25 fields**:
+  `title^3, description^2, tags.name^2, entities.name^2, topics.name^1`.
 2. **Semantic reranking:** For the recalled set only, compute cosine similarity between the **user vector `u`** and each candidate's embedding; normalize cosine and BM25 to [0,1] → `cos_norm`, `bm25_norm`.
 3. **Lane score:** `OS_score = 0.50·cos_norm + 0.50·bm25_norm`; sort by this score.
 4. **Within-lane MMR** (λ = 0.7), similarity = **Jaccard over entities + tags**; keep shortlist ≈ **2× OS lane quota** (default 140).
@@ -210,23 +210,20 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
    * Remove any videos that appear in the **OS lane's top 140** (2× OS quota).
    * Rationale: OS lane already captured semantically similar content; graph lane's job is to surface adjacent-but-different content.
 
-3. **Semantic distance filtering:**
+3. **Cosine similarity filtering:**
 
    * For each remaining candidate, compute cosine similarity with user vector `u`.
-   * **Filter:** keep only candidates with cosine similarity ∈ **[0.1, 0.9]** (lenient bounds as tuning knobs).
-     - Lower bound (0.1): exclude completely unrelated content
-     - Upper bound (0.9): exclude near-duplicates of history
-   * **Semantic distance** = `1 - cosine_norm`
+   * **Filter:** keep only candidates with cosine similarity ∈ **[0.15, 0.85]** (lenient bounds as tuning knobs).
+     - Lower bound (0.15): exclude completely unrelated content
+     - Upper bound (0.85): exclude near-duplicates of history
 
 4. **Lane score:** 
    ```
-   Graph_score = semantic_distance
+   Graph_score = cosine_norm
    ```
-   Rationale: Random walks provide connectivity (visit frequency), early dedupe ensures novelty from OS lane, cosine filtering provides relevance bounds. Final ranking optimizes purely for content difference to maximize serendipity.
+   Rationale: Random walks provide connectivity (visit frequency), early dedupe ensures novelty from OS lane. Among connected and novel candidates, cosine similarity ranks by relevance/quality—take the best matches within the graph-adjacent space.
 
 5. **Within-lane MMR** (λ = 0.7); keep shortlist ≈ **60**.
-
-6. **Under-fill handling:** If filtered candidates < 60, widen cosine bounds (e.g., [0.05, 0.95]) or accept under-fill and backfill from OS lane.
 
 ### 4) Cross-lane dedupe (already handled)
 
@@ -239,7 +236,7 @@ Take **70** from the OS shortlist and **30** from the Graph shortlist. If a lane
 
 ### 6) Global MMR (final ordering only)
 
-Run one global MMR across the **100** selected videos to interleave and diversify (use lane scores as relevance; similarity from embeddings + topics/entities/tags). **Preserve the 70/30 counts**—this step only reorders.
+Run one global MMR across the **100** selected videos to interleave and diversify (use lane scores as relevance; λ = 0.7, similarity = **Jaccard over entities + tags**). **Preserve the 70/30 counts**—this step only reorders.
 
 ### 7) Explanations
 

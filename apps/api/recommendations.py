@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from opensearchpy import OpenSearch
 
 from search import VIDEOS_INDEX, ensure_indexes, get_client
+from graph import get_driver as get_neo4j_driver, ensure_constraints as ensure_graph_constraints
 from models import (
     Entity,
     Tag,
@@ -23,6 +24,7 @@ from models import (
     WatchHistory,
 )
 
+# Recommendation configuration
 HISTORY_DEPTH = 50
 RECENCY_HALF_LIFE_DAYS = 21
 
@@ -33,10 +35,18 @@ MAX_TOPIC_SEEDS = 5
 TARGET_TOTAL_RECOMMENDATIONS = 100
 OS_LANE_QUOTA = 70
 GRAPH_LANE_QUOTA = 30
-OS_BM25_RECALL_K = 500
 MMR_LAMBDA = 0.7
+
+# OpenSearch lane tuning
+OS_BM25_RECALL_K = 500
 OS_COSINE_WEIGHT = 0.5
 OS_BM25_WEIGHT = 0.5
+
+# Graph lane tuning
+GRAPH_WALK_LENGTH = 7
+GRAPH_WALKS_PER_NODE = 50
+GRAPH_COSINE_MIN = 0.1
+GRAPH_COSINE_MAX = 0.9
 
 BM25_TOP_LEVEL_FIELDS = [
     "title^3",
@@ -80,6 +90,7 @@ class Seed:
     canonical_name: str
     name: str
     weight: float
+    id: Optional[UUID] = None
 
 
 @dataclass
@@ -111,6 +122,24 @@ class OSLaneResult:
     bm25_terms: List[str] = field(default_factory=list)
 
 
+@dataclass
+class GraphCandidate:
+    video_id: str
+    visit_count: int = 0
+    document: Dict[str, Any] = field(default_factory=dict)
+    embedding: Optional[List[float]] = None
+    cosine_score: Optional[float] = None
+    cosine_norm: float = 0.0
+    lane_score: float = 0.0
+    sources: List[str] = field(default_factory=list)
+
+
+@dataclass
+class GraphLaneResult:
+    shortlist: List[GraphCandidate]
+    candidates: List[GraphCandidate]
+
+
 def _recency_weight(last_watched_at: Optional[datetime], now: datetime) -> float:
     if last_watched_at is None:
         return 0.0
@@ -137,6 +166,7 @@ def _normalize_top(
         return []
     return [
         Seed(
+            id=item.get("id"),
             canonical_name=item["canonical_name"],
             name=item["name"],
             weight=item["score"] / total,
@@ -256,6 +286,7 @@ def _collect_seed_scores(
         entry = scores.setdefault(
             master.id,
             {
+                "id": master.id,
                 "canonical_name": master.canonical_name,
                 "name": master.name,
                 "score": 0.0,
@@ -670,3 +701,257 @@ def run_opensearch_lane(seed_bundle: SeedBundle) -> OSLaneResult:
     )
 
     return OSLaneResult(shortlist=shortlist, candidates=candidates_sorted, bm25_terms=bm25_terms)
+
+
+def _graph_random_walk_stream(seed_bundle: SeedBundle) -> List[Dict[str, Any]]:
+    """
+    Runs random walks on a Cypher-projected graph using Entity+Tag seeds.
+    Returns aggregated visit counts of visited Video nodes only.
+
+    Output rows: { "id": str, "count": int }
+    """
+    drv = get_neo4j_driver()
+    if not drv:
+        log.info("graph_lane_skip: neo4j_unavailable")
+        return []
+
+    # Collect seed node ids (Entity + Tag) as strings
+    seed_ids: List[str] = []
+    for s in (seed_bundle.entities or []):
+        if s.id:
+            try:
+                seed_ids.append(str(s.id))
+            except Exception:
+                pass
+    for s in (seed_bundle.tags or []):
+        if s.id:
+            try:
+                seed_ids.append(str(s.id))
+            except Exception:
+                pass
+
+    # Deduplicate and enforce limits similar to OS usage (top-K already applied in seed bundle)
+    seed_ids = list(dict.fromkeys(seed_ids))
+    if not seed_ids:
+        log.info("graph_lane_skip: empty_seeds")
+        return []
+
+    ensure_graph_constraints()
+
+    graph_name = f"rec_walk_{int(datetime.now(timezone.utc).timestamp()*1000)}"
+
+    visited: List[Dict[str, Any]] = []
+
+    try:
+        with drv.session() as sess:
+            # TODO: Consider an hourly/daily precomputed projection to speed this up 
+            # Build projection using native projection API
+            sess.run(
+                """
+                CALL gds.graph.project(
+                  $graphName,
+                  ['Video', 'Tag', 'Entity'],
+                  {
+                    HAS_TAG: {
+                      type: 'HAS_TAG',
+                      orientation: 'UNDIRECTED',
+                      properties: {
+                        weight: {
+                          property: 'weight',
+                          defaultValue: 1.0
+                        }
+                      }
+                    },
+                    HAS_ENTITY: {
+                      type: 'HAS_ENTITY',
+                      orientation: 'UNDIRECTED',
+                      properties: {
+                        weight: {
+                          property: 'importance',
+                          defaultValue: 1.0
+                        }
+                      }
+                    }
+                  }
+                )
+                """,
+                graphName=graph_name,
+            )
+
+            # Stream random walks, map nodeIds back, filter to Video, and aggregate counts in Cypher
+            result = sess.run(
+                """
+                MATCH (s)
+                WHERE (s:Entity OR s:Tag) AND s.id IN $seedIds
+                WITH collect(id(s)) AS startNodes
+                CALL gds.randomWalk.stream($graphName, {
+                  sourceNodes: startNodes,
+                  walkLength: $walkLength,
+                  walksPerNode: $walksPerNode,
+                  relationshipWeightProperty: 'weight'
+                })
+                YIELD nodeIds
+                UNWIND nodeIds AS nodeId
+                MATCH (v:Video)
+                WHERE id(v) = nodeId AND v.id IS NOT NULL
+                RETURN v.id AS id, count(*) AS count
+                ORDER BY count DESC
+                """,
+                graphName=graph_name,
+                seedIds=seed_ids,
+                walkLength=GRAPH_WALK_LENGTH,
+                walksPerNode=GRAPH_WALKS_PER_NODE,
+            )
+            for rec in result:
+                try:
+                    visited.append({
+                        "id": rec["id"],
+                        "count": int(rec["count"] or 0),
+                    })
+                except Exception:
+                    continue
+    except Exception as exc:
+        log.warning("graph_lane_random_walk_failed", exc_info=exc)
+    finally:
+        try:
+            with drv.session() as sess:
+                sess.run("CALL gds.graph.drop($graphName)", graphName=graph_name)
+        except Exception:
+            pass
+
+    return visited
+
+
+def _graph_build_candidates_from_walks(
+    walk_rows: Sequence[Dict[str, Any]],
+    *,
+    exclude_video_ids: Optional[Sequence[str]] = None,
+) -> List[GraphCandidate]:
+    """
+    Convert aggregated walk rows {id, count} into GraphCandidate list.
+    Excludes any videos present in exclude_video_ids.
+    """
+    if not walk_rows:
+        return []
+
+    excludes = set(str(x) for x in (exclude_video_ids or []))
+    candidates: List[GraphCandidate] = []
+    seen: Set[str] = set()
+    for row in walk_rows:
+        vid = str(row.get("id")) if row.get("id") is not None else ""
+        if not vid or vid in seen or vid in excludes:
+            continue
+        seen.add(vid)
+        try:
+            cnt = int(row.get("count") or 0)
+        except Exception:
+            cnt = 0
+        candidates.append(
+            GraphCandidate(
+                video_id=vid,
+                visit_count=cnt,
+                sources=["graph_walk"],
+            )
+        )
+    return candidates
+
+
+def run_graph_lane(
+    seed_bundle: SeedBundle,
+    os_top_ids: Optional[Sequence[str]] = None,
+) -> GraphLaneResult:
+    """
+    Graph lane orchestrator (early phase):
+    - Random walks from Entity+Tag seeds
+    - Early exclusions: user history and OS top-140
+    - Returns GraphLaneResult with candidates populated; scoring and MMR will follow
+    """
+    # Random walks and aggregation (already aggregated in Cypher)
+    walk_rows = _graph_random_walk_stream(seed_bundle)
+
+    # Build exclude list: user history + OS top-140
+    exclude_history = [str(h.video_id) for h in (seed_bundle.history or [])]
+    exclude_os = [str(x) for x in (os_top_ids or [])]
+    exclude_ids = list({*exclude_history, *exclude_os})
+
+    candidates = _graph_build_candidates_from_walks(walk_rows, exclude_video_ids=exclude_ids)
+
+    log.info(
+        "graph_lane_stage early_dedupe walk_rows=%d candidates_after_exclude=%d history_excludes=%d os_excludes=%d",
+        len(walk_rows), len(candidates), len(exclude_history), len(exclude_os)
+    )
+
+    # Hydrate candidates with OS docs and embeddings
+    _graph_hydrate_candidates_from_os(candidates)
+
+    # Compute cosine similarity against user embedding when available
+    filtered: List[GraphCandidate] = list(candidates)
+    if seed_bundle.user_embedding:
+        user_vec = [float(x) for x in seed_bundle.user_embedding]
+        for cand in filtered:
+            if cand.embedding:
+                cand.cosine_score = cosine_similarity(user_vec, cand.embedding)
+            else:
+                cand.cosine_score = 0.0
+        filtered = [c for c in filtered if GRAPH_COSINE_MIN <= float(c.cosine_score or 0.0) <= GRAPH_COSINE_MAX]
+    else:
+        # No user embedding -> skip cosine filtering
+        for cand in filtered:
+            cand.cosine_score = 0.0
+
+    # Score lane using cosine similarity directly (higher is better)
+    cosine_norms = _normalize_scores([c.cosine_score for c in filtered])
+    for cand, cos_norm in zip(filtered, cosine_norms):
+        cand.cosine_norm = cos_norm
+        cand.lane_score = cos_norm
+
+    # Sort by lane_score desc for deterministic pool
+    filtered_sorted = sorted(filtered, key=lambda c: (c.lane_score, c.visit_count), reverse=True)
+
+    # MMR shortlist ≈ 2x lane quota
+    shortlist_limit = min(2 * GRAPH_LANE_QUOTA, len(filtered_sorted))
+    if shortlist_limit <= 0:
+        return GraphLaneResult(shortlist=[], candidates=filtered_sorted)
+
+    shortlist = max_marginal_relevance(
+        filtered_sorted,
+        score_fn=lambda c: c.lane_score,
+        similarity_fn=_candidate_similarity,
+        limit=shortlist_limit,
+        lambda_weight=MMR_LAMBDA,
+    )
+
+    return GraphLaneResult(shortlist=shortlist, candidates=filtered_sorted)
+
+
+def _os_fetch_sources(video_ids: Sequence[str]) -> Dict[str, Dict[str, Any]]:
+    if not video_ids:
+        return {}
+    client = get_client()
+    if not client:
+        return {}
+    ensure_indexes()
+    unique_ids = list(dict.fromkeys(str(x) for x in video_ids))
+    try:
+        response = client.mget(index=VIDEOS_INDEX, body={"ids": unique_ids})
+    except Exception as exc:
+        log.warning("graph_lane_os_mget_failed", exc_info=exc)
+        return {}
+    docs = response.get("docs", []) if isinstance(response, dict) else []
+    out: Dict[str, Dict[str, Any]] = {}
+    for doc in docs:
+        if not doc or not doc.get("found"):
+            continue
+        vid = str(doc.get("_id"))
+        source = doc.get("_source") or {}
+        out[vid] = source
+    return out
+
+
+def _graph_hydrate_candidates_from_os(candidates: Sequence[GraphCandidate]) -> None:
+    ids = [c.video_id for c in candidates]
+    by_id = _os_fetch_sources(ids)
+    for c in candidates:
+        src = by_id.get(c.video_id) or {}
+        c.document = src
+        c.embedding = _safe_get_embedding(src)
