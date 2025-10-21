@@ -50,7 +50,7 @@ spec:
             port: 9100
           initialDelaySeconds: 60
           periodSeconds: 10
-          failureThreshold: 18 # 3 minute window
+          failureThreshold: 30 # 5 minute window
         livenessProbe:
           httpGet:
             path: /ready

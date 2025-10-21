@@ -63,6 +63,7 @@ kubectl apply -f "$K8S_DIR/stateful/postgres.yaml"
 kubectl apply -f "$K8S_DIR/stateful/redis.yaml"
 kubectl apply -f "$K8S_DIR/stateful/minio.yaml"
 kubectl apply -f "$K8S_DIR/stateful/opensearch.yaml"
+kubectl apply -f "$K8S_DIR/stateful/neo4j.yaml"
 kubectl apply -f "$K8S_DIR/stateful/mailpit.yaml"
 echo "   Stateful services deployed"
 echo ""
@@ -72,6 +73,7 @@ echo "Waiting for stateful services to be ready..."
 kubectl wait --for=condition=ready pod -l app=postgres --timeout=120s -n "$NAMESPACE" 2>/dev/null || true
 kubectl wait --for=condition=ready pod -l app=redis --timeout=120s -n "$NAMESPACE" 2>/dev/null || true
 kubectl wait --for=condition=ready pod -l app=minio --timeout=120s -n "$NAMESPACE" 2>/dev/null || true
+kubectl wait --for=condition=ready pod -l app=neo4j --timeout=180s -n "$NAMESPACE" 2>/dev/null || true
 kubectl wait --for=condition=ready pod -l app=mailpit --timeout=120s -n "$NAMESPACE" 2>/dev/null || true
 echo "   Infrastructure services ready"
 echo ""
@@ -117,6 +119,7 @@ echo "   - Web:           http://localhost:3000"
 echo "   - API:           http://localhost:8000"
 echo "   - MinIO Console: http://localhost:9001"
 echo "   - Mailpit:       http://localhost:8025"
+echo "   - Neo4j Browser: http://localhost:30474"
 echo ""
 echo "Monitor autoscaling:"
 echo "   - Watch dashboard:  ./k8s/scripts/monitor-autoscaling.sh"
