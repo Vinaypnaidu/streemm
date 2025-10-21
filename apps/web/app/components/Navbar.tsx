@@ -53,7 +53,7 @@ export default function Navbar() {
             </button>
             <Link
               href="/"
-              className="flex items-center gap-1 text-xl font-semibold tracking-tight hover:opacity-80 transition"
+              className="flex items-center gap-1 text-2xl font-semibold tracking-tight hover:opacity-80 transition"
             >
               <span className="inline-block w-3 h-3 rounded-sm bg-violet-600 mr-1" />
               Streem

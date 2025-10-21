@@ -17,7 +17,7 @@ export default function RootLayout({
         <AuthProvider>
           <AuthGate>
             <Navbar />
-            <main className="min-h-[calc(100vh-56px)] md:pl-72">
+            <main className="min-h-[calc(100vh-56px)] md:pl-56">
               {children}
             </main>
           </AuthGate>

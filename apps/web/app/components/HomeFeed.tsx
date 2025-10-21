@@ -14,6 +14,7 @@ type FeedItem = {
   thumbnail_url?: string;
   duration_seconds?: number;
   progress_percent?: number | null;
+  explanation?: string | null;
 };
 type FeedResp = { items: FeedItem[]; source: "keywords" | "random" };
 
@@ -57,12 +58,12 @@ export default function HomeFeed() {
   }, []);
 
   return (
-    <div className="px-12 py-8">
-      <h1 className="text-3xl font-semibold mb-4">For you</h1>
+    <div className="px-8 py-6">
+      <h1 className="text-2xl font-semibold mb-4">For you</h1>
       {loading && !data ? (
         <p className="text-sm text-neutral-600">Loading…</p>
       ) : err ? null : !data || data.items.length === 0 ? null : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {data.items.map((v) => {
             const name = (v.title && v.title.trim()) || "Untitled";
             return (
@@ -96,6 +97,11 @@ export default function HomeFeed() {
                   >
                     {name}
                   </Link>
+                  {v.explanation && (
+                    <p className="text-xs text-neutral-400 mt-2 truncate">
+                      {v.explanation}
+                    </p>
+                  )}
                 </div>
               </div>
             );

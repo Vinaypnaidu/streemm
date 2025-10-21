@@ -19,7 +19,6 @@ router = APIRouter(prefix="/homefeed", tags=["homefeed"])
 log = logging.getLogger("routes_homefeed")
 
 
-
 def _compute_progress_map(
     db: Session, user: User, video_ids: List[str]
 ) -> Dict[str, Optional[float]]:
@@ -87,8 +86,8 @@ def homefeed(
         vid_str = str(v.id)
         thumb_url = build_public_url(build_thumbnail_key(vid_str))
         
-        # Determine source for this video
-        source = result.sources.get(vid_str, "unknown")
+        # Get explanation if available
+        explanation = result.explanations.get(vid_str)
         
         items.append(
             HomeFeedItem(
@@ -102,6 +101,7 @@ def homefeed(
                     else None
                 ),
                 progress_percent=progress.get(vid_str),
+                explanation=explanation,
             )
         )
     

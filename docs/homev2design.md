@@ -240,7 +240,7 @@ Run one global MMR across the **100** selected videos to interleave and diversif
 
 ### 7) Explanations
 
-* **OS pick:** "Semantic match to your history; aligns with **{Topic/Entity/Tag}**."
+* **OS pick:** "Matches your interests: **{Topic/Entity/Tag}**."
 * **Graph pick:** "Discovered through your interests in **{Seed}**—a fresh take you might enjoy."
 
 ### 8) Useful counters (to tune later)

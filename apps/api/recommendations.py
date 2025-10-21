@@ -146,12 +146,14 @@ class UnifiedCandidate:
     lane_score: float
     document: Dict[str, Any]
     lane_source: str
+    explanation: Optional[str] = None
 
 
 @dataclass
 class RecommendationResult:
     video_ids: List[str]
     sources: Dict[str, str]
+    explanations: Dict[str, str]
     os_count: int
     graph_count: int
 
@@ -973,6 +975,106 @@ def _graph_hydrate_candidates_from_os(candidates: Sequence[GraphCandidate]) -> N
         c.embedding = _safe_get_embedding(src)
 
 
+def _find_best_matches(
+    candidate_doc: Dict[str, Any],
+    seed_bundle: SeedBundle,
+) -> tuple[Optional[str], Optional[str]]:
+    """
+    Find the best matching entity and tag between video and user seeds.
+    Returns (best_entity_name, best_tag_name) based on seed weights.
+    """
+    # Build maps of canonical_name -> (name, weight) for matching
+    seed_entities_map = {s.canonical_name.lower(): (s.name, s.weight) for s in seed_bundle.entities}
+    seed_tags_map = {s.canonical_name.lower(): (s.name, s.weight) for s in seed_bundle.tags}
+    
+    video_entities = {
+        e.get("canonical_name", "").lower()
+        for e in (candidate_doc.get("entities") or [])
+        if isinstance(e, dict) and e.get("canonical_name")
+    }
+    video_tags = {
+        t.get("canonical_name", "").lower()
+        for t in (candidate_doc.get("tags") or [])
+        if isinstance(t, dict) and t.get("canonical_name")
+    }
+    
+    # Find matched entities with their weights
+    matched_entities = [
+        (seed_entities_map[canonical], canonical)
+        for canonical in video_entities
+        if canonical in seed_entities_map
+    ]
+    
+    # Find matched tags with their weights
+    matched_tags = [
+        (seed_tags_map[canonical], canonical)
+        for canonical in video_tags
+        if canonical in seed_tags_map
+    ]
+    
+    # Get best entity (highest weight)
+    entity_match: Optional[str] = None
+    if matched_entities:
+        best_entity = max(matched_entities, key=lambda x: x[0][1])
+        entity_match = best_entity[0][0]  # name
+    
+    # Get best tag (highest weight)
+    tag_match: Optional[str] = None
+    if matched_tags:
+        best_tag = max(matched_tags, key=lambda x: x[0][1])
+        tag_match = best_tag[0][0]  # name
+    
+    return entity_match, tag_match
+
+
+def _generate_os_explanation(
+    candidate_doc: Dict[str, Any],
+    seed_bundle: SeedBundle
+) -> str:
+    entity_match, tag_match = _find_best_matches(candidate_doc, seed_bundle)
+    
+    if entity_match and tag_match:
+        formatted_entity = entity_match.title()
+        return f"Features {formatted_entity} — matches your {tag_match} interests"
+    elif entity_match:
+        return f"Matches your interest in {entity_match}"
+    elif tag_match:
+        return f"Matches your {tag_match} interests"
+    else:
+        return "Matches your interests"
+
+
+def _generate_graph_explanation(
+    candidate_doc: Dict[str, Any],
+    seed_bundle: SeedBundle,
+) -> str:
+    entity_match, tag_match = _find_best_matches(candidate_doc, seed_bundle)
+    
+    if entity_match:
+        return f"Connected to your interest in {entity_match.title()}"
+    elif tag_match:
+        return f"Connected to your {tag_match} interests"
+    
+    video_entities = candidate_doc.get("entities") or []
+    video_tags = candidate_doc.get("tags") or []
+    
+    if video_entities and len(video_entities) > 0:
+        first_entity = video_entities[0]
+        if isinstance(first_entity, dict):
+            entity_name = first_entity.get("name", "").strip()
+            if entity_name:
+                return f"Something new about {entity_name.title()}"
+    
+    if video_tags and len(video_tags) > 0:
+        first_tag = video_tags[0]
+        if isinstance(first_tag, dict):
+            tag_name = first_tag.get("name", "").strip()
+            if tag_name:
+                return f"Related to {tag_name} content"
+    
+    return "A fresh recommendation from your viewing network"
+
+
 def get_recommendations(
     db: Session,
     user_id: UUID,
@@ -1029,22 +1131,26 @@ def get_recommendations(
     unified_pool: List[UnifiedCandidate] = []
     
     for c in os_selected:
+        explanation = _generate_os_explanation(c.document, seed_bundle)
         unified_pool.append(
             UnifiedCandidate(
                 video_id=c.video_id,
                 lane_score=c.lane_score,
                 document=c.document,
                 lane_source="os",
+                explanation=explanation,
             )
         )
     
     for c in graph_selected:
+        explanation = _generate_graph_explanation(c.document, seed_bundle)
         unified_pool.append(
             UnifiedCandidate(
                 video_id=c.video_id,
                 lane_score=c.lane_score,
                 document=c.document,
                 lane_source="graph",
+                explanation=explanation,
             )
         )
 
@@ -1057,13 +1163,16 @@ def get_recommendations(
         lambda_weight=MMR_LAMBDA,
     )
 
-    # Build result with source tracking
+    # Build result with source tracking and explanations
     video_ids: List[str] = []
     sources: Dict[str, str] = {}
+    explanations: Dict[str, str] = {}
 
     for c in final_ordered:
         video_ids.append(c.video_id)
         sources[c.video_id] = c.lane_source
+        if c.explanation:
+            explanations[c.video_id] = c.explanation
 
     # Count actual lane representation in final results
     final_os_count = sum(1 for s in sources.values() if s == "os")
@@ -1077,6 +1186,7 @@ def get_recommendations(
     return RecommendationResult(
         video_ids=video_ids,
         sources=sources,
+        explanations=explanations,
         os_count=final_os_count,
         graph_count=final_graph_count,
     )

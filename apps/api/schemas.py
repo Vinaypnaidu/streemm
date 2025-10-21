@@ -126,6 +126,7 @@ class HomeFeedItem(BaseModel):
     thumbnail_url: Optional[str] = None
     duration_seconds: Optional[float] = None
     progress_percent: Optional[float] = None
+    explanation: Optional[str] = None
 
 
 class HomeFeedResponse(BaseModel):

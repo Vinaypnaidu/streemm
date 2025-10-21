@@ -63,8 +63,8 @@ export default function HistoryPage() {
   if (loading || !me) return null;
 
   return (
-    <div className="px-12 py-8">
-      <h1 className="text-3xl font-semibold mb-4">History</h1>
+    <div className="px-8 py-6">
+      <h1 className="text-2xl font-semibold mb-4">History</h1>
 
       {fetching && items.length === 0 ? (
         <p className="text-sm text-neutral-600">Loading…</p>

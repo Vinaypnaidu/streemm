@@ -105,8 +105,8 @@ export default function VideosPage() {
   if (loading || !me) return null;
 
   return (
-    <div className="px-12 py-8">
-      <h1 className="text-3xl font-semibold mb-4">Your videos</h1>
+    <div className="px-8 py-6">
+      <h1 className="text-2xl font-semibold mb-4">Your videos</h1>
       {fetching && items.length === 0 ? (
         <p className="text-sm text-neutral-600">Loading…</p>
       ) : items.length === 0 ? (
@@ -114,7 +114,7 @@ export default function VideosPage() {
           No videos yet. Use the “+ Create” button to upload.
         </p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {items.map((v) => {
             const name = (v.title && v.title.trim()) || v.original_filename;
             const open = menuFor === v.id;
