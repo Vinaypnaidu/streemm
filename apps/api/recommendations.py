@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, TypeVar
@@ -780,12 +781,29 @@ def _graph_random_walk_stream(seed_bundle: SeedBundle) -> List[Dict[str, Any]]:
 
     ensure_graph_constraints()
 
-    graph_name = f"rec_walk_{int(datetime.now(timezone.utc).timestamp()*1000)}"
+    # Use UUID to ensure uniqueness even with concurrent requests
+    graph_name = f"rec_walk_{uuid.uuid4().hex}"
 
     visited: List[Dict[str, Any]] = []
+    graph_created = False
 
     try:
         with drv.session() as sess:
+            # Check if graph already exists
+            try:
+                exists_result = sess.run(
+                    "CALL gds.graph.exists($graphName) YIELD exists RETURN exists",
+                    graphName=graph_name
+                )
+                exists_record = exists_result.single()
+                if exists_record and exists_record.get("exists"):
+                    log.warning("graph_lane_name_collision: graph_exists=%s", graph_name)
+                    # Regenerate name and try again
+                    graph_name = f"rec_walk_{uuid.uuid4().hex}"
+            except Exception:
+                # If exists check fails, proceed anyway
+                pass
+
             # TODO: Consider an hourly/daily precomputed projection to speed this up 
             # Build projection using native projection API
             sess.run(
@@ -819,6 +837,7 @@ def _graph_random_walk_stream(seed_bundle: SeedBundle) -> List[Dict[str, Any]]:
                 """,
                 graphName=graph_name,
             )
+            graph_created = True
 
             # Stream random walks, map nodeIds back, filter to Video, and aggregate counts in Cypher
             result = sess.run(
@@ -855,11 +874,16 @@ def _graph_random_walk_stream(seed_bundle: SeedBundle) -> List[Dict[str, Any]]:
     except Exception as exc:
         log.warning("graph_lane_random_walk_failed", exc_info=exc)
     finally:
-        try:
-            with drv.session() as sess:
-                sess.run("CALL gds.graph.drop($graphName)", graphName=graph_name)
-        except Exception:
-            pass
+        # Always attempt cleanup if graph was created
+        if graph_created:
+            try:
+                with drv.session() as sess:
+                    sess.run(
+                        "CALL gds.graph.drop($graphName, false) YIELD graphName",
+                        graphName=graph_name
+                    )
+            except Exception as cleanup_exc:
+                log.warning("graph_lane_cleanup_failed: graph=%s", graph_name, exc_info=cleanup_exc)
 
     return visited
 
