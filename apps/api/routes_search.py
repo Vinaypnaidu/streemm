@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -16,51 +16,6 @@ from storage import build_thumbnail_key, build_public_url
 
 router = APIRouter(prefix="/search", tags=["search"])
 log = logging.getLogger("routes_search")
-
-STOPWORDS: Set[str] = {
-    "a",
-    "an",
-    "the",
-    "to",
-    "is",
-    "in",
-    "on",
-    "of",
-    "for",
-    "and",
-    "or",
-    "as",
-    "at",
-    "be",
-    "by",
-    "with",
-    "from",
-    "this",
-    "that",
-    "it",
-    "you",
-    "your",
-    "are",
-    "was",
-    "were",
-    "will",
-    "can",
-    "not",
-    "we",
-    "our",
-    "they",
-    "them",
-    "their",
-    "i",
-    "me",
-    "my",
-    "mine",
-    "video",
-    "videos",
-    "watch",
-    "watched",
-}
-_MAX_SPAN_WINDOWS = 8
 
 
 def _normalize_tokens(text: str) -> List[str]:
@@ -156,28 +111,6 @@ def _build_meta_query(q: str, limit: int, offset: int) -> Dict[str, Any]:
     }
 
 
-def _iter_span_windows(tokens: List[str]) -> List[Tuple[List[str], float]]:
-    """Return a capped list of (window_tokens, base_boost) pairs for span_near boosters."""
-
-    def sliding(seq: List[str], k: int) -> List[List[str]]:
-        if len(seq) < k:
-            return []
-        return [seq[i : i + k] for i in range(0, len(seq) - k + 1)]
-
-    windows: List[Tuple[List[str], float]] = []
-    for k, base_boost in ((5, 1.5), (4, 1.2)):
-        wins = sliding(tokens, k)
-        if wins:
-            take = max(1, min(len(wins), _MAX_SPAN_WINDOWS // 2))
-            idxs = [
-                round(i * (len(wins) - 1) / (take - 1)) if take > 1 else 0
-                for i in range(take)
-            ]
-            for idx in idxs:
-                windows.append((wins[idx], base_boost))
-    return windows
-
-
 @router.get("")
 def search(
     q: str = Query(..., min_length=1),
@@ -254,71 +187,28 @@ def search(
     tr_next_offset: Optional[int] = None
     first_by_video: Dict[str, Tuple[float, Dict]] = {}
 
+    # Only search transcripts if we have at least 3 words
     if word_count >= 3:
         try:
             tr_limit = max(1, min(1000, limit_transcript))
             tr_offset = max(0, offset_transcript)
 
-            if 3 <= word_count <= 5:
-                msm = "70%"
-            elif word_count >= 6:
-                msm = "50%"
-
-            match_query = {
-                "query": full_phrase,
-                "operator": "or",
-                "minimum_should_match": msm,
-                "auto_generate_synonyms_phrase_query": False,
-            }
-
-            should_clauses: List[Dict[str, Any]] = []
-            # Reward long in-order runs (5-grams, then 4-grams) with span_near boosters.
-            for i, (window, base_boost) in enumerate(_iter_span_windows(tokens)):
-                slop_val = 2 if len(window) >= 5 else 1
-                should_clauses.append(
-                    {
-                        "span_near": {
-                            "clauses": [
-                                {"span_term": {"text": term}} for term in window
-                            ],
-                            "in_order": True,
-                            "slop": slop_val,
-                            "boost": round(base_boost * (0.97**i), 3),
-                        }
+            # Step 1: Try exact phrase match first (with minimal slop for word order tolerance)
+            exact_body: Dict[str, Any] = {
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "match_phrase": {
+                                    "text": {
+                                        "query": full_phrase,
+                                        "slop": 0,  # Exact phrase match
+                                    }
+                                }
+                            }
+                        ]
                     }
-                )
-
-            bool_query: Dict[str, Any] = {
-                "must": [
-                    {
-                        "match": {
-                            "text": match_query,
-                        }
-                    }
-                ]
-            }
-            if should_clauses:
-                bool_query["should"] = should_clauses
-
-            content_terms = [t for t in tokens if t not in STOPWORDS and len(t) > 2]
-            if content_terms:
-                # Soft guard: require at least 1 non-glue terms to match using a dis_max term set.
-                bool_query.setdefault("should", []).append(
-                    {
-                        "dis_max": {
-                            "queries": [
-                                {"term": {"text": term}} for term in content_terms
-                            ],
-                            "tie_breaker": 0.0,
-                        }
-                    }
-                )
-                bool_query["minimum_should_match"] = 1
-            if lang:
-                bool_query.setdefault("filter", []).append({"term": {"lang": lang}})
-
-            body: Dict[str, Any] = {
-                "query": {"bool": bool_query},
+                },
                 "highlight": {
                     "pre_tags": ["<em>"],
                     "post_tags": ["</em>"],
@@ -330,30 +220,77 @@ def search(
                     },
                 },
             }
-            if tokens:
-                # Final tie-break: rescore top hits with the full phrase to push near-exact matches to the top.
-                body["rescore"] = {
-                    "window_size": 200,
-                    "query": {
-                        "rescore_query": {
-                            "match_phrase": {
-                                "text": {
-                                    "query": full_phrase,
-                                    "slop": 1,
-                                }
-                            }
-                        },
-                        "query_weight": 1.0,
-                        "rescore_query_weight": 2.0,
-                    },
-                }
+            if lang:
+                exact_body["query"]["bool"].setdefault("filter", []).append(
+                    {"term": {"lang": lang}}
+                )
 
             res_tr = client.search(
                 index=TRANSCRIPTS_INDEX,
                 from_=tr_offset,
                 size=tr_limit,
-                body=body,
+                body=exact_body,
             )
+
+            total_tr = res_tr.get("hits", {}).get("total", {})
+            exact_hits_count = int(total_tr.get("value", 0))
+
+            # Step 2: If no exact matches, fall back to fuzzy matching
+            if exact_hits_count == 0:
+                log.info(
+                    f"No exact matches for '{full_phrase}', falling back to fuzzy match"
+                )
+
+                # Calculate allowed mismatches based on word count
+                # 4-5 words: allow 1 word wrong/missing/extra (atleast 70% match)
+                # 6+ words: allow 2 words wrong/missing/extra (atleast 65% match)
+                if word_count == 4:
+                    minimum_should_match = "75%"
+                elif word_count >= 5:
+                    minimum_should_match = "60%"
+                else:  # word_count == 3
+                    minimum_should_match = "100%"
+
+                fuzzy_body: Dict[str, Any] = {
+                    "query": {
+                        "bool": {
+                            "must": [
+                                {
+                                    "match": {
+                                        "text": {
+                                            "query": full_phrase,
+                                            "operator": "or",
+                                            "minimum_should_match": minimum_should_match,
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "highlight": {
+                        "pre_tags": ["<em>"],
+                        "post_tags": ["</em>"],
+                        "fields": {
+                            "text": {
+                                "number_of_fragments": 1,
+                                "fragment_size": 180,
+                            }
+                        },
+                    },
+                }
+                if lang:
+                    fuzzy_body["query"]["bool"].setdefault("filter", []).append(
+                        {"term": {"lang": lang}}
+                    )
+
+                res_tr = client.search(
+                    index=TRANSCRIPTS_INDEX,
+                    from_=tr_offset,
+                    size=tr_limit,
+                    body=fuzzy_body,
+                )
+
+            # Process hits and group by video (keep earliest match per video)
             hits_tr = res_tr.get("hits", {}).get("hits", [])
             for h in hits_tr:
                 src = h.get("_source", {})
@@ -364,6 +301,7 @@ def search(
                 if vid not in first_by_video or start < first_by_video[vid][0]:
                     first_by_video[vid] = (start, h)
 
+            # Fetch video metadata for matched videos
             video_ids = list(first_by_video.keys())
             if video_ids:
                 rows = db.query(Video).filter(Video.id.in_(video_ids)).all()
@@ -389,6 +327,7 @@ def search(
                             ),
                         }
                     )
+
             total_tr = res_tr.get("hits", {}).get("total", {})
             tr_est_total = int(total_tr.get("value", 0))
             tr_next_offset = (
