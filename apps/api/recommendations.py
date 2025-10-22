@@ -49,9 +49,32 @@ GRAPH_WALKS_PER_NODE = settings.graph_walks_per_node
 GRAPH_COSINE_MIN = settings.graph_cosine_min
 GRAPH_COSINE_MAX = settings.graph_cosine_max
 
+# smaller numbers for testing -----------------------------------
+HISTORY_DEPTH = 25
+RECENCY_HALF_LIFE_DAYS = 1
+
+MAX_TAG_SEEDS = 20
+MAX_ENTITY_SEEDS = 15
+MAX_TOPIC_SEEDS = 5
+
+TARGET_TOTAL_RECOMMENDATIONS = 10
+OS_LANE_QUOTA = 7
+GRAPH_LANE_QUOTA = 3
+MMR_LAMBDA = 0.7
+
+OS_BM25_RECALL_K = 30
+OS_COSINE_WEIGHT = 0.5
+OS_BM25_WEIGHT = 0.5
+
+GRAPH_WALK_LENGTH = 7
+GRAPH_WALKS_PER_NODE = 50
+GRAPH_COSINE_MIN = 0.1
+GRAPH_COSINE_MAX = 0.9
+# smaller numbers for testing -----------------------------------
+
 BM25_TOP_LEVEL_FIELDS = [
     "title^3",
-    "description^2",
+    "description^1",
 ]
 
 OS_SOURCE_FIELDS = [
@@ -531,7 +554,7 @@ def _execute_bm25_search(
                                     }
                                 }
                             },
-                            "boost": 2.0,
+                            "boost": 1.0,
                         }
                     },
                     {

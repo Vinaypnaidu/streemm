@@ -117,7 +117,7 @@ Metadata: content_type={one of enum}, language={en}
 * `embedding` as a plain `float` array stored in `_source` (not indexed; used for cosine reranking only).
 
 **BM25 fields (and boosts):**
-`title^3, description^2, tags.name^2, entities.name^2, topics.name^1`
+`title^3, description^1, entities.name^2, tags.name^1, topics.name^1`
 
 ### 3.3 Neo4j Graph Layer (bipartite, lean)
 
@@ -186,7 +186,7 @@ We run **OpenSearch** and **Graph** independently because they optimize *differe
 ### 2) OS lane (OpenSearch: BM25 recall + semantic rerank)
 
 1. **Recall (BM25-first):** BM25(500) using seed names over **BM25 fields**:
-  `title^3, description^2, tags.name^2, entities.name^2, topics.name^1`.
+  `title^3, description^1, entities.name^2, tags.name^1, topics.name^1`.
 2. **Semantic reranking:** For the recalled set only, compute cosine similarity between the **user vector `u`** and each candidate's embedding; normalize cosine and BM25 to [0,1] → `cos_norm`, `bm25_norm`.
 3. **Lane score:** `OS_score = 0.50·cos_norm + 0.50·bm25_norm`; sort by this score.
 4. **Within-lane MMR** (λ = 0.7), similarity = **Jaccard over entities + tags**; keep shortlist ≈ **2× OS lane quota** (default 140).

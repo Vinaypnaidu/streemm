@@ -69,10 +69,11 @@ Now that you know the content type, extract the following fields:
 ## 2. Topics (`topics`)
 
 Main subjects, skills, and concepts the video focuses on. Extract moderately specific topics that receive substantial coverage - not overly specific details or tangential mentions.
+**IMPORTANT**: Limit to 5 topics maximum. Prioritize subjects that receive substantial focus and are central to what the video is about. When choosing between candidates, select the most prominent ones. (DO NOT extract for scripted entertainment content like sitcoms, tv series, movies, web series, sketches, short films, etc.)
 
 **What to look for** (these are just examples to guide your thinking):
 - **Educational videos** often include skills taught, concepts explained, techniques demonstrated etc.
-- **Entertainment videos** might discuss various subjects - extract sparingly, only topics that receive substantial focus
+- **Entertainment videos** might discuss various subjects - extract sparingly (IMPORTANT: DO NOT extract topics for scripted entertainment content like sitcoms, tv series, movies, web series, sketches, short films, etc.)
 - **Review videos** typically focus on product categories, features being evaluated, comparison points etc.
 - **Interview videos** usually center on subjects discussed, areas of expertise etc.
 - **News videos** commonly cover issues investigated, events covered, policy areas etc.
@@ -107,10 +108,11 @@ Main subjects, skills, and concepts the video focuses on. Extract moderately spe
 ## 3. Entities (`entities`)
 
 Entities are **specific instances central to the video** - such as particular people, organizations, products, places, theories/frameworks, events, or key concepts discussed.
+**IMPORTANT**: Limit to 7 entities maximum. Focus on well-known, identifiable named entities. When choosing between candidates, select the most important and exclude generic terms that don't provide discovery value.
 
 **What you might find** (just examples to help guide your thinking):
 - **Educational videos** often include tools, frameworks, instructors, historical figures, key things being worked with
-- **Entertainment videos** might reference actors, characters, shows/movies, creators
+- **Entertainment videos** might reference actors, characters, shows/movies, creators (only named entities for entertainment, no common stuff)
 - **Review videos** typically feature products/services being evaluated, competitor brands
 - **Interview videos** usually include guests, their companies/projects, people they reference
 - **News videos** commonly cover people involved in events, organizations being investigated
@@ -137,13 +139,12 @@ Entities are **specific instances central to the video** - such as particular pe
 
 ## 4. Tags (`tags`)
 
-Searchable labels derived from topics, entities, and the video's overall content nature.
+Searchable labels derived from topics, entities, and the video's overall content.
 
-**IMPORTANT: Generalize up from topics and entities** - don't just convert their names to tags. Extract the **broader domains, fields, and categories** they belong to, then add tags that describe the video's format and presentation style. Think about what terms users would naturally search for to discover content like this.
+**IMPORTANT**: Generalize up from topics and entities - don't just convert their names to tags. Extract the **broader domains, fields, and categories** they belong to. Think about what terms users would naturally search for to discover content like this.
+**Quality check:** Ask yourself: "Does this tag help users discover content like this?" Remove tags that don't pass this test. Broad tags are totally fine - irrelevant tags are not. Tags that cover minor details should be omitted.
 
-**For entertainment content:** Do not create tags based on topics that cover episodic plots or specific details.
-
-**Quality check:** Ask yourself: "Does this tag help users discover content like this?" Remove tags that don't pass this test. Broad tags are totally fine - irrelevant tags are not.
+**IMPORTANT**: For scripted entertainment content (eg. sitcoms, TV series, movies, web series, sketches, short films, etc.): Limit to 3 tags maximum, focusing on genre and format (e.g., `comedy`, `tv-series`, `sitcom`, `drama`, `action`, `thriller`, `romance`, `sci-fi`, etc.). Avoid tags based on specific plot points or episodic details - keep tags broad and category-focused.
 
 ### A) From Topics (Generalize into broader categories, NOT just repeat topic names)
 Topics describe what the video is about - generalize them into **searchable domain/field tags**. Do NOT create tags that are identical to topic names.
@@ -170,24 +171,14 @@ Examples:
 - "NASA" → `space`, `aerospace` (NOT `nasa`)
 - "Grand Canyon" → `national-park`, `nature`, `travel` (NOT `grand-canyon`)
 - "The Beatles" → `music`, `rock`, `band` (NOT `the-beatles`)
+- "Friends" → `tv-series`, `comedy`, `sitcom` (NOT `friends`)
 
 **Ask yourself:** What type/category is this entity? What domain does it belong to? 
-
-### C) From Video's Overall Content and Nature (Format, type, and presentation style)
-Describe **how the content is presented** - the video's format and structural characteristics, not what it's about.
-
-Examples by content type:
-- Entertainment: `tv-show`, `sitcom`, `comedy`, `drama`, `gaming`, `music-video`, `vlog`, `travel-vlog`, `compilation`, `best-of`, `highlights`, `tv-clip`, `mockumentary`
-- Educational: `tutorial`, `course`, `how-to`, `explainer`, `lecture`, `demonstration`
-- Review: `review`, `unboxing`, `comparison`, `buying-guide`
-- Other: `podcast`, `interview`, `documentary`, `news`, `short-form`, `long-form`
-
-**Aim for 2-4 tags** from this section that describe the video's format and presentation style.
 
 **Guidelines:**
 - Use **lowercase, hyphenated** format (`machine-learning`, not `Machine Learning`)
 - Be specific but searchable: `italian-cuisine` > `food` (but include both)
-- Aim for **8-15 tags** total across all sources
+- Aim for **3-8 tags** total across all sources, just the most relevant
 - Balance specificity with discoverability
 - **weight** (0.0-1.0): Relevance/confidence
   - 0.8-1.0: Core, highly relevant
@@ -265,7 +256,6 @@ Return **valid JSON only** (no markdown, no explanation).
     {{"tag": "fermentation", "weight": 0.7}},
     {{"tag": "cooking", "weight": 0.75}},
     {{"tag": "culinary-skills", "weight": 0.75}},
-    {{"tag": "tutorial", "weight": 0.6}}
   ]
 }}
 ```

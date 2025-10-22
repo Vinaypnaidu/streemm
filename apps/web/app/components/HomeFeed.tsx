@@ -71,16 +71,16 @@ export default function HomeFeed() {
                 key={v.id}
                 className="relative rounded-lg overflow-hidden bg-neutral-900"
               >
-                <div className="p-4 pb-0">
+                <div>
                   <Link href={`/videos/${v.id}`} className="block">
                     {v.thumbnail_url ? (
                       <img
                         src={v.thumbnail_url}
                         alt=""
-                        className="w-full aspect-video object-cover rounded-md"
+                        className="w-full aspect-video object-cover"
                       />
                     ) : (
-                      <div className="w-full aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">
+                      <div className="w-full aspect-video grid place-items-center text-neutral-400 bg-neutral-800">
                         No thumbnail
                       </div>
                     )}

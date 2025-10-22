@@ -254,9 +254,9 @@ export default function VideoDetailPage() {
     (detail.title && detail.title.trim()) || detail.original_filename;
 
   return (
-    <div className="px-10 py-6">
+    <div className="px-8 py-6">
       <div className="mx-auto w-full grid gap-3">
-        <h1 className="text-3xl font-semibold">{name}</h1>
+        <h1 className="text-2xl font-semibold">{name}</h1>
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-neutral-400">Quality:</span>

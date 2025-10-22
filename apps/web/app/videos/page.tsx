@@ -123,16 +123,16 @@ export default function VideosPage() {
                 key={v.id}
                 className="relative rounded-lg overflow-hidden bg-neutral-900"
               >
-                <div className="p-4 pb-0">
+                <div>
                   <Link href={`/videos/${v.id}`} className="block">
                     {v.thumbnail_public_url ? (
                       <img
                         src={v.thumbnail_public_url}
                         alt=""
-                        className="w-full aspect-video object-cover rounded-md"
+                        className="w-full aspect-video object-cover"
                       />
                     ) : (
-                      <div className="w-full aspect-video grid place-items-center text-neutral-400 bg-neutral-800 rounded-md">
+                      <div className="w-full aspect-video grid place-items-center text-neutral-400 bg-neutral-800">
                         No thumbnail
                       </div>
                     )}
@@ -141,7 +141,7 @@ export default function VideosPage() {
 
                 {/* 3-dots menu trigger */}
                 <button
-                  className="absolute top-6 right-6 p-2 rounded-md bg-neutral-900/70 hover:bg-neutral-800"
+                  className="absolute top-2 right-2 p-2 rounded-md bg-neutral-900/70 hover:bg-neutral-800"
                   onClick={() => setMenuFor(open ? null : v.id)}
                   aria-haspopup="menu"
                   aria-expanded={open}

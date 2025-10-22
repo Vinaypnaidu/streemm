@@ -82,7 +82,7 @@ def _build_meta_query(q: str, limit: int, offset: int) -> Dict[str, Any]:
                     {
                         "multi_match": {
                             "query": q,
-                            "fields": ["title^1", "description^1"],
+                            "fields": ["title^2", "description^1"],
                             "type": "best_fields",
                         }
                     },
@@ -98,7 +98,7 @@ def _build_meta_query(q: str, limit: int, offset: int) -> Dict[str, Any]:
                                     }
                                 }
                             },
-                            "boost": 1.0,
+                            "boost": 2.0,
                         }
                     },
                     {
