@@ -80,7 +80,7 @@ Implementation details available at [docs/recommendations.md](docs/implementatio
 ### Watch history example
 ![Watch history example](docs/images/history1.png)
 
-These examples are based on a small dataset of ~30 videos covering sitcoms, food videos, computer sciene related videos including ML, DevOps, programming etc.
+These examples are based on a small dataset of ~30 videos covering sitcoms, food videos, computer science related videos including ML, DevOps, programming etc.
 
 ## Run with Docker Compose
 
