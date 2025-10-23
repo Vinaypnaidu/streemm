@@ -1,12 +1,12 @@
 # Streem
 
-A cloud-native, autoscaling video platform for upload, transcoding, search, and playback. It supports:
+A cloud-native, autoscaling video platform for upload, transcoding, enrichment, search, and playback. It supports:
 
 - **Direct Uploads**: Browser uploads to S3-compatible storage via presigned URLs
-- **Background Processing**: HLS transcoding (720p/480p) with thumbnails and captions
+- **Background Processing**: HLS transcoding (720p/480p) with thumbnails and captions, video enrichment (extract entities/topics/tags)
 - **Intelligent Search**: Search video content by metadata and transcripts ("jump to moments")
 - **Watch History**: Resume playback with progress tracking
-- **Home Feed**: Simple personalized recommendations
+- **Home Feed**: Personalized recommendations (two-lane: OpenSearch + Graph)
 - **Email Notifications**: Alerts when videos are ready to watch
 
 
@@ -17,22 +17,70 @@ A cloud-native, autoscaling video platform for upload, transcoding, search, and 
 ### Overview:
 - **API** (FastAPI): authentication, uploads, finalize, video detail/list, history, search, health
 - **Web** (Next.js): UI for upload, playback, search, history, and home feed
-- **Worker**: ffprobe, HLS (720p/480p), thumbnail, captions, indexing
-- **Notifier**: sends "video ready" emails
+- **Worker**: ffprobe, HLS (720p/480p), thumbnail, captions, indexing, LLM pipeline for video enrichment
 - **PostgreSQL**: primary data store
 - **Redis**: sessions, rate limits, queues, locks
 - **MinIO**: S3‑compatible object storage for raw and processed assets
 - **OpenSearch**: metadata and transcript search
-- **Mailpit**: local SMTP for dev
+- **Neo4j**: graph relationships for entities/topics/tags powering discovery
 - **Kubernetes (kind)**: orchestration
 - **Autoscaling (KEDA)**: scales worker based on Redis queue length
+- **Notifier**: sends "video ready" emails
+- **Mailpit**: local SMTP for dev
 
-For design choices and implementation details, see [design.md](docs/design.md).
+## Home Feed Overview (Recommendations)
 
-## Fun transcript search example
+Two-lane recommendation system combining semantic similarity with graph-based discovery.
 
-![System Architecture](docs/images/transcriptsearch.png)
+**Why two lanes:**
+We run OpenSearch and Graph independently because they optimize different objectives. OS excels at similarity (semantic + keyword). Graph excels at adjacency/serendipity (nearby-but-new). Mixing recall or scores blurs those goals; instead we keep lanes separate, dedupe in favor of OS (freeing Graph capacity for novel picks), enforce a 70/30 blend, then do a single global MMR for a pleasant final order.
 
+**Storage:**
+- Postgres – structured data (entities, topics, tags, summaries)
+- OpenSearch – search index + embeddings
+- Neo4j – graph relationships
+
+**Data Flow:**
+
+```
+Video Content (transcript, title, description)
+    ↓
+LLM Processing
+    → Extract: entities, topics, tags, summary, metadata
+    ↓
+Write to Three Stores 
+    ├─→ Postgres (structured storage, deduplication)
+    ├─→ Neo4j (graph relationships)
+    └─→ OpenSearch (search index + embeddings)
+    ↓
+User Watches Videos
+    ↓
+Recommendation Engine
+    ├─→ OpenSearch Lane (70%): BM25 + semantic similarity
+    └─→ Graph Lane (30%): random walks through connections
+    ↓
+Dedupe + Blend + Diversify (MMR)
+    ↓
+Final 100 Recommendations
+```
+
+Home feed design available at [docs/recommendations.md](docs/recommendations.md).
+
+Implementation details available at [docs/recommendations.md](docs/implementation.md). (to be updated)
+
+
+## Examples
+
+### Transcript search example
+![Transcript search example](docs/images/transcriptsearch.png)
+
+### Home feed example (see corresponding watch history below)
+![Home feed example](docs/images/rec1.png)
+
+### Watch history example
+![Watch history example](docs/images/history1.png)
+
+These examples are based on a small dataset of ~30 videos covering sitcoms, food videos, computer sciene relted videos including ML, DevOps, programming etc.
 
 ## Run with Docker Compose
 
@@ -50,6 +98,7 @@ First boot pulls images and installs dependencies; give it a few minutes.
 - Web: http://localhost:3000
 - API: http://localhost:8000 (docs at http://localhost:8000/docs)
 - MinIO Console: http://localhost:9001 (login: `minioadmin` / `minioadmin`)
+- Neo4j Browser: http://localhost:7474 
 - Mailpit UI: http://localhost:8025
 
 ### Teardown (keep volumes)
@@ -78,6 +127,7 @@ k8s/
 │   ├── redis.yaml                  # Redis StatefulSet 
 │   ├── minio.yaml                  # MinIO StatefulSet 
 │   ├── opensearch.yaml             # OpenSearch StatefulSet 
+│   ├── neo4j.yaml                  # Neo4j StatefulSet 
 │   └── mailpit.yaml                # Mailpit Deployment 
 ├── app/   
 │   ├── api.yaml                    # FastAPI backend Deployment 
@@ -173,6 +223,7 @@ kubectl apply -f k8s/stateful/postgres.yaml
 kubectl apply -f k8s/stateful/redis.yaml
 kubectl apply -f k8s/stateful/minio.yaml
 kubectl apply -f k8s/stateful/opensearch.yaml
+kubectl apply -f k8s/stateful/neo4j.yaml
 kubectl apply -f k8s/stateful/mailpit.yaml
 
 # Wait for stateful services to be ready
@@ -246,6 +297,7 @@ Once deployed, access the services:
 - **Web App:** http://localhost:3000
 - **API:** http://localhost:8000 (docs at http://localhost:8000/docs)
 - **MinIO Console:** http://localhost:9001 (login: `minioadmin` / `minioadmin`)
+- **Neo4j Browser:** http://localhost:7474 
 - **Mailpit UI:** http://localhost:8025
 
 ### Debugging & Logs
