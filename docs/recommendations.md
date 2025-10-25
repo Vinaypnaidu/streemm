@@ -241,20 +241,20 @@ Metadata: content_type={one of enum}, language={en}
    * Remove any videos that appear in the **OS lane's top 140** (2× OS quota).
    * Rationale: OS lane already captured semantically similar content; graph lane's job is to surface adjacent-but-different content.
 
-3. **Cosine similarity filtering:**
+<!-- 3. **Cosine similarity filtering:**
 
    * For each remaining candidate, compute cosine similarity with user vector `u`.
    * **Filter:** keep only candidates with cosine similarity ∈ **[0.1, 0.9]** (lenient bounds as tuning knobs).
      - Lower bound (0.1): exclude completely unrelated content
-     - Upper bound (0.9): exclude very similar content
+     - Upper bound (0.9): exclude very similar content -->
 
-4. **Lane score:** 
+3. **Lane score:** 
    ```
    Graph_score = cosine_norm
    ```
    Rationale: Random walks provide connectivity (visit frequency), early dedupe ensures novelty from OS lane. Among connected and novel candidates, cosine similarity ranks by relevance/quality—take the best matches within the graph-adjacent space.
 
-5. **Within-lane MMR** (λ = 0.7); keep shortlist ≈ **60**.
+4. **Within-lane MMR** (λ = 0.7); keep shortlist ≈ **60**.
 
 #### 4) Cross-lane dedupe (already handled)
 
